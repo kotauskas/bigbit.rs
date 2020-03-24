@@ -1,7 +1,5 @@
-# bigbit
+# BigBit
 ![Crates.io link](https://img.shields.io/crates/v/bigbit "BigBit on Crates.io")
-
-## BigBit — compact storage of arbitrarily large numbers
 
 This is an implementation of the [BigBit standard][BigBitStd], used for representing arbitrarily large numbers and strings in a compact way. The only implementation provided by the author is [a Node.js implementation](https://github.com/bigbit/bigbitjs "BigBit.js on GitHub") — this crate aims to implement the functionality presented there with idiomatic Rust code.
 

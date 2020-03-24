@@ -1,6 +1,6 @@
 [package]
 name = "bigbit"
-version = "0.0.0"
+version = "0.0.2"
 authors = ["Kotauskas <v.toncharov@gmail.com>"]
 edition = "2018"
 description = "Implements the BigBig format, allowing for compact storage of arbitrarily large numbers."
@@ -8,5 +8,7 @@ readme = "README.md"
 license = "Zlib"
 keywords = ["bigbit", "bytebit", "bignum", "gmp", "num"]
 categories = ["algorithms", "encoding", "mathematics", "no-std", "parser-implementations"]
+repository = "https://github.com/kotauskas/bigbit.rs"
+documentation = "https://docs.rs/bigbit/"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
