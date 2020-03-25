@@ -2,97 +2,281 @@
 //!
 //! If you only want non-negative integers, you should stick to this format. Otherwise, use either Head Byte or Extended Head Byte.
 
+use core::slice::SliceIndex;
 use alloc::vec::Vec;
+
+/// The `Result` specialization for the methods converting iterators/arrays of bytes into instances of `LBNum`.
+pub type DecodeResult = Result<LBNum, InvalidLBSequence>;
 
 /// A number in the Linked Bytes format, capable of storing arbitrarily large non-negative integers.
 #[derive(Clone)]
-pub struct LBNum(Vec<LinkedByte>);
+pub struct LBNum(pub(crate) LBSequence);
 
 impl LBNum {
     /// The zero value.
     ///
     /// This does not allocate memory.
-    pub const ZERO: Self = Self(Vec::new());
+    pub const ZERO: Self = Self(LBSequence::empty());
     /// The amount of bytes used in the number.
     #[inline(always)]
     #[must_use]
     pub fn num_bytes(&self) -> usize {
-        self.0.len()
+        self.0.inner().len()
     }
     /// Increments the value.
     #[inline(always)]
     pub fn increment(&mut self) {
         self.increment_at_index(0);
     }
+    #[inline(always)]
+    #[must_use]
+    pub const fn inner(&self) -> &LBSequence {
+        &self.0
+    }
+    /// Consumes the number and returns its inner sequence.
+    #[inline(always)]
+    #[must_use]
+    pub fn into_inner(self) -> LBSequence {
+        self.0
+    }
+    /// Returns an iterator over the linked bytes, in **little**-endian byte order.
+    #[inline(always)]
+    pub fn iter_le(&self) -> impl Iterator<Item = LinkedByte> + DoubleEndedIterator + '_ {
+        self.0.iter_le()
+    }
+    /// Returns an iterator over the linked bytes, in **big**-endian byte order.
+    #[inline(always)]
+    pub fn iter_be(&self) -> impl Iterator<Item = LinkedByte> + DoubleEndedIterator + '_ {
+        self.0.iter_be()
+    }
+
+    /// Creates an `LBNum` from an `LBSequence`, correcting any and all incorrect bytes into their valid state. **Little-endian byte order is assumed, regardless of platform.**
+    ///
+    /// If any of the bytes except for the last one are endpoints (most significant bit cleared), they are converted into linked (most significant bit set), and if the last byte is linked, it's converted into and endpoint.
+    #[inline(always)]
+    pub fn from_sequence(mut op: LBSequence) -> Self {
+        Self::fix_in_place(&mut op.inner_mut());
+        Self(op)
+    }
 
     /// Ensures that the last element is an endpoint.
     pub(crate) fn ensure_last_is_end(&mut self) {
-        if let Some(last) = self.0.last_mut() {
+        if let Some(last) = self.0.inner_mut().last_mut() {
             *last = last.into_end()
         } else {}
     }
     /// Converts the last element to a linked byte, for adding together two `LBNum`s.
     pub(crate) fn convert_last_to_linked(&mut self) {
-        if let Some(last) = self.0.last_mut() {
+        if let Some(last) = self.0.inner_mut().last_mut() {
             *last = last.into_linked()
         } else {}
     }
-    /// Increments the byte at the specified index and returns whether wrapping occurred, or `None` if such an index does not exist.
-    pub(crate) fn increment_at_index(&mut self, index: usize) -> Option<bool> {
-        if self.0.is_empty() {
-            self.0.push(LinkedByte::from(1));
-            return Some(false);
+
+    /// Checks whether the operand is a compliant LB sequence.
+    ///
+    /// See [`InvalidLBSequence`][0] for reasons why it might not be compliant.
+    ///
+    /// [0]: struct.InvalidLBSequence.html "InvalidLBSequence — marker error type representing that the decoder has encountered an invalid Linked Bytes sequence"
+    pub fn check_slice(op: &[LinkedByte]) -> bool {
+        if let Some(last) = op.last() {
+            // Sike, the last element is not an endpoint so we can skip the entire thing.
+            if last.is_linked() {return false;}
+        } else {
+            // Zero sequences are empty.
+            return true;
         }
-        self.0.get(index)?;
-        for i in index..self.0.len() {
-            if let Some(refindex) = self.0.get_mut(i) {
-                let (val, wrap) = refindex.add_with_carry(LinkedByte::from(1));
-                *refindex = val;
-                if !wrap {return Some(false);}
-            } else {
-                self.0.push(LinkedByte::from(1));
-                return Some(true);
-            }
+        // After the cache residency of `op` was introduced in the previous check, just fuzz through the rest of the elements.
+        for el in &op[0..(op.len() - 1)] {
+            if el.is_end() {return false;} // Invalid byte detected, lethal force engaged.
         }
-        Some(true)
+        true // ok we're fine
+    }
+    /// Makes a slice of `LinkedByte`s suitable for storage in a `HBNum` by marking the last byte as an endpoint and the rest as linked ones.
+    pub fn fix_in_place(op: &mut [LinkedByte]) {
+        if let Some(last) = op.last_mut() {
+            // Fix the last element in place.
+            if last.is_linked() {*last = last.into_end();}
+        } else {
+            // We're already finished, it's a valid zero.
+            return;
+        }
+        let end = op.len() - 1;
+        for el in &mut op[0..end] {
+            if el.is_end() {*el = el.into_linked();}
+        }
     }
 }
-impl core::ops::Add<&Self> for LBNum {
-    type Output = Self;
+impl core::convert::TryFrom<Vec<LinkedByte>> for LBNum {
+    type Error = InvalidLBSequence;
+
+    /// Converts a `Vec<LinkedByte>` into an `LBNum`. **Little-endian byte order is assumed, regardless of platform.**
+    ///
+    /// # Errors
+    /// See [`InvalidLBSequence`][0].
+    ///
+    /// [0]: struct.InvalidLBSequence.html "InvalidLBSequence — marker error type representing that the decoder has encountered an invalid Linked Bytes sequence"
+    #[inline]
+    fn try_from(op: Vec<LinkedByte>) -> DecodeResult {
+        if Self::check_slice(&op) {
+            Ok(Self(LBSequence::from(op)))
+        } else {
+            Err(InvalidLBSequence)
+        }
+    }
+}
+impl core::convert::TryFrom<LBSequence> for LBNum {
+    type Error = InvalidLBSequence;
+
+    /// Converts an `LBSequence` into an `LBNum`. **Little-endian byte order is assumed, regardless of platform.**
+    ///
+    /// # Errors
+    /// See [`InvalidLBSequence`][0].
+    ///
+    /// [0]: struct.InvalidLBSequence.html "InvalidLBSequence — marker error type representing that the decoder has encountered an invalid Linked Bytes sequence"
+    #[inline]
+    fn try_from(op: LBSequence) -> DecodeResult {
+        if Self::check_slice(&op.inner()) {
+            Ok(Self(op))
+        } else {
+            Err(InvalidLBSequence)
+        }
+    }
+}
+impl core::iter::FromIterator<LinkedByte> for LBNum {
+    /// Converts an iterator over linked bytes into an LBNum. **Little-endian byte order is assumed, regardless of platform.**
+    ///
+    /// If any of the bytes except for the last one are endpoints (most significant bit cleared), they are converted into linked (most significant bit set), and if the last byte is linked, it's converted into and endpoint.
+    ///
+    /// If possible, use `TryFrom` or `from_sequence` instead.
+    fn from_iter<T: IntoIterator<Item = LinkedByte>>(op: T) -> Self {
+        let mut resulting_vec = op.into_iter().collect::<Vec<LinkedByte>>();
+        Self::fix_in_place(&mut resulting_vec);
+        Self(LBSequence::from(resulting_vec))
+    }
+}
+// Implementations for arithmetic operations are located in crate::ops::linkedbytes.
+
+/// Marker error type representing that the decoder has encountered an invalid Linked Bytes sequence, created by the `TryFrom` implementation of `LBNum`.
+///
+/// The only reason for this to ever happen is incorrect state of the link bit in one of the bytes: all the bytes except for the last one **have to be linked** (most significant bit set), and the last one **has to be an endpoint** (most significant bit clear).
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq)]
+pub struct InvalidLBSequence;
+
+/// An owned unchecked Linked Bytes sequence, used for storing either strings or numbers.
+#[derive(Clone)]
+pub struct LBSequence(pub(crate) Vec<LinkedByte>);
+impl LBSequence {
+    /// Creates an empty `LBSequence`.
     #[inline(always)]
     #[must_use]
-    fn add(mut self, rhs: &Self) -> Self {
-        self += rhs;
-        self
+    pub const fn empty() -> Self {
+        Self(Vec::new())
+    }
+
+    /// Immutably borrows the inner container.
+    #[inline(always)]
+    #[must_use]
+    pub const fn inner(&self) -> &Vec<LinkedByte> {
+        &self.0
+    }
+    /// Mutably borrows the inner container.
+    #[inline(always)]
+    #[must_use]
+    pub fn inner_mut(&mut self) -> &mut Vec<LinkedByte> {
+        &mut self.0
+    }
+    /// Performs slice indexing.
+    ///
+    /// See [the standard library documentation][0] for more.
+    ///
+    /// [0]: https://doc.rust-lang.org/std/primitive.slice.html#method.get "std::slice::get — returns a reference to an element or subslice depending on the type of index"
+    #[inline(always)]
+    pub fn get<I: SliceIndex<[LinkedByte]>>(&self, index: I) -> Option<&<I as SliceIndex<[LinkedByte]>>::Output> {
+        self.inner().get(index)
+    }
+    /// Performs mutable slice indexing.
+    ///
+    /// See [the standard library documentation][0] for more.
+    ///
+    /// [0]: https://doc.rust-lang.org/std/primitive.slice.html#method.get_mut "std::slice::get_mut — returns a mutable reference to an element or subslice depending on the type of index"
+    #[inline(always)]
+    pub fn get_mut<I: SliceIndex<[LinkedByte]>>(&mut self, index: I) -> Option<&mut <I as SliceIndex<[LinkedByte]>>::Output> {
+        self.inner_mut().get_mut(index)
+    }
+    /// Returns the number of bytes in the sequence.
+    #[inline(always)]
+    #[must_use]
+    pub fn len(&self) -> usize {
+        self.0.len()
+    }
+    /// Returns `true` if the sequence is empty (= 0) or `false` otherwise.
+    #[inline(always)]
+    #[must_use]
+    pub fn is_empty(&self) -> bool {
+        self.0.is_empty()
+    }
+
+    /// Returns an iterator over the linked bytes in **little**-endian byte order.
+    #[inline(always)]
+    pub fn iter_le(&self) -> impl Iterator<Item = LinkedByte> + DoubleEndedIterator + '_ {
+        self.0.iter().copied()
+    }
+    /// Returns an iterator over the linked bytes in **big**-endian byte order.
+    #[inline(always)]
+    pub fn iter_be(&self) -> impl Iterator<Item = LinkedByte> + DoubleEndedIterator + '_ {
+        self.iter_le().rev()
+    }
+    /// Returns an iterator over **mutable references** to the linked bytes in **little**-endian byte order.
+    #[inline(always)]
+    pub fn iter_mut_le(&mut self) -> impl Iterator<Item = &mut LinkedByte> + DoubleEndedIterator + '_ {
+        self.0.iter_mut()
+    }
+    /// Returns an iterator over **mutable references** to the linked bytes in **big**-endian byte order.
+    #[inline(always)]
+    pub fn iter_mut_be(&mut self) -> impl Iterator<Item = &mut LinkedByte> + DoubleEndedIterator + '_ {
+        self.iter_mut_le().rev()
     }
 }
-impl core::ops::AddAssign<&Self> for LBNum {
-    fn add_assign(&mut self, rhs: &Self) {
-        if rhs.0.is_empty() {return;}
-        if self.0.len() < rhs.0.len() {
-            self.convert_last_to_linked();
-            self.0.resize(rhs.0.len(), LinkedByte::ZERO_LINK);
-            self.ensure_last_is_end();
-        }
-        // Create a pair iterator. For every value of this, other is its corresponding value from rhs.
-        for (i, other) in (0..self.0.len()).zip(rhs.0.iter()) {
-            let this = &mut self.0[i];
-            let (val, wrapped) = this.add_with_carry(*other);
-            *this = val;
-            if wrapped {
-                if i == self.0.len() - 1 {
-                    // If we're right at the end, just push a new element.
-                    self.0.push(LinkedByte::from(1));
-                } else {
-                    // If not, increment the next byte.
-                    self.increment_at_index(i + 1);
-                }
-            }
-        }
+impl From<Vec<LinkedByte>> for LBSequence {
+    #[inline(always)]
+    #[must_use]
+    fn from(op: Vec<LinkedByte>) -> Self {
+        Self(op)
+    }
+}
+impl From<&[LinkedByte]> for LBSequence {
+    /// Clones the contens of the slice into a Linked Bytes sequence.
+    #[inline(always)]
+    #[must_use]
+    fn from(op: &[LinkedByte]) -> Self {
+        Self(Vec::from(op))
+    }
+}
+impl AsRef<[LinkedByte]> for LBSequence {
+    #[inline(always)]
+    #[must_use]
+    fn as_ref(&self) -> &[LinkedByte] {
+        self.0.as_ref()
+    }
+}
+impl AsMut<[LinkedByte]> for LBSequence {
+    #[inline(always)]
+    #[must_use]
+    fn as_mut(&mut self) -> &mut [LinkedByte] {
+        self.0.as_mut()
+    }
+}
+impl core::iter::FromIterator<LinkedByte> for LBSequence {
+    /// Converts an iterator over linked bytes into an `LBSequence`. **Little-endian byte order is assumed, regardless of platform.**
+    #[inline(always)]
+    #[must_use]
+    fn from_iter<T: IntoIterator<Item = LinkedByte>>(op: T) -> Self {
+        Self(op.into_iter().collect::<Vec<LinkedByte>>())
     }
 }
 
 /// An element in a series of Linked Bytes.
+#[repr(transparent)]
 #[derive(Copy, Clone, PartialEq, Eq)]
 pub struct LinkedByte (u8);
 
@@ -116,10 +300,20 @@ impl LinkedByte {
     pub const ZERO_LINK: Self = Self(Self::LINK_MASK);
 
     /// Returns `true` if the byte is linked to a following byte, `false` otherwise.
+    ///
+    /// The opposite of `is_end`.
     #[inline(always)]
     #[must_use]
     pub fn is_linked(self) -> bool {
         (self.0 & Self::LINK_MASK) != 0
+    }
+    /// Returns `true` if the byte is **not** linked to a following byte (i.e. is an endpoint), `false` otherwise.
+    ///
+    /// The opposite of `is_linked`.
+    #[inline(always)]
+    #[must_use]
+    pub fn is_end(self) -> bool {
+        (self.0 & Self::LINK_MASK) == 0
     }
     /// Returns the value of the linked byte, in the range from 0 to 127, inclusively.
     ///
@@ -188,21 +382,50 @@ impl LinkedByte {
         }
     }
 
-    // Consumes the value and returns the inner byte.
+    /// Consumes the value and unwraps it into its inner `u8`, retaining the link bit if it's set.
+    ///
+    /// Use [`into_int7`][0] if you need only the value without the link bit, which is usually the case.
+    ///
+    /// [0]: method.into_int7 "into_int7 — consume the value and unwrap it into its inner 7-bit integer"
     #[inline(always)]
     #[must_use]
     pub fn into_inner(self) -> u8 {
         self.0
     }
+    /// Consumes the value and unwraps it into its inner 7-bit integer, i.e. dropping the link bit if it's set.
+    ///
+    /// Use [`into_inner`] if you need the unmodified value with the link bit unmodified.
+    #[inline(always)]
+    #[must_use]
+    pub fn into_int7(self) -> u8 {
+        self.into_end().0
+    }
 }
 impl From<u8> for LinkedByte {
+    /// Constructs an endpoint byte from a `u8`.
+    ///
+    /// The most significant bit is silently dropped. Use `into_linked` to convert the result into a linked byte if you actually want to initialize it like that.
     #[inline(always)]
     #[must_use]
     fn from(op: u8) -> Self {
-        Self(op)
+        Self(op).into_end()
+    }
+}
+impl From<(u8, bool)> for LinkedByte {
+    /// Constructs either a linked or an endpoint byte depending on the second argument.
+    ///
+    /// The most significant bit is silently dropped.
+    #[inline(always)]
+    #[must_use]
+    fn from(op: (u8, bool)) -> Self {
+        // This casts the boolean into a 0/1 u8 and shifts it into the link bit position, then constructs a mask which either accepts the link bit or sets it.
+        let mask = Self::VALUE_MASK | ((op.1 as u8) << 7);
+        let result = Self(op.0).into_linked(); // Quickly make it linked to use the mask
+        Self(result.0 & mask)
     }
 }
 impl From<LinkedByte> for u8 {
+    /// Consumes the byte and unwraps it into its inner `u8`, retaining the link bit if it's set.
     #[inline(always)]
     #[must_use]
     fn from(op: LinkedByte) -> Self {
@@ -217,5 +440,19 @@ impl core::fmt::Debug for LinkedByte {
             if self.is_linked() {"link"} else {"end"}
         );
         ds.finish()
+    }
+}
+
+use core::cmp::{self, Ordering};
+impl cmp::PartialOrd for LinkedByte {
+    #[inline(always)]
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.cmp(other))
+    }
+}
+impl cmp::Ord for LinkedByte {
+    #[inline(always)]
+    fn cmp(&self, other: &Self) -> Ordering {
+        self.into_end().0.cmp(&other.into_end().0)
     }
 }
