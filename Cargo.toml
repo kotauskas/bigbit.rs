@@ -1,6 +1,6 @@
 [package]
 name = "bigbit"
-version = "0.0.3"
+version = "0.0.4"
 authors = ["Kotauskas <v.toncharov@gmail.com>"]
 edition = "2018"
 description = "Implements the BigBig format, allowing for compact storage of arbitrarily large numbers."
