@@ -39,6 +39,13 @@ impl ops::Add<&Self> for LBNum {
         self
     }
 }
+impl ops::Add<Self> for LBNum {
+    type Output = Self;
+    #[inline(always)]
+    fn add(self, rhs: Self) -> Self {
+        self + &rhs
+    }
+}
 impl ops::AddAssign<&Self> for LBNum {
     fn add_assign(&mut self, rhs: &Self) {
         if rhs.0.inner().is_empty() {return;}
@@ -62,6 +69,11 @@ impl ops::AddAssign<&Self> for LBNum {
                 }
             }
         }
+    }
+}
+impl ops::AddAssign<Self> for LBNum {
+    fn add_assign(&mut self, rhs: Self) {
+        *self += &rhs;
     }
 }
 

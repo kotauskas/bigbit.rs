@@ -31,6 +31,15 @@ macro_rules! impl_from_lb_for_primitive {
                 $ty::try_from(LBNumRef::from(op))
             }
         }
+
+        impl TryFrom<LBNum> for $ty {
+            type Error = TryFromIntError;
+
+            #[inline(always)]
+            fn try_from(op: LBNum) -> Result<$ty, TryFromIntError> {
+                $ty::try_from(&op)
+            }
+        }
     };
 }
 

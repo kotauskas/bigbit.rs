@@ -85,6 +85,18 @@ impl ops::Sub<&Self> for LBNum {
         self
     }
 }
+impl ops::Sub<Self> for LBNum {
+    type Output = Self;
+
+    /// Subtracts an `LBNum` from `self`.
+    ///
+    /// # Panics
+    /// Subtraction underflow is undefined for the Linked Bytes format, since it only specifies unsigned integers.
+    #[inline(always)]
+    fn sub(self, rhs: Self) -> Self {
+        self - &rhs
+    }
+}
 impl ops::SubAssign<&Self> for LBNum {
     /// Subtracts an `LBNum` from `self` in place.
     ///
@@ -97,6 +109,16 @@ impl ops::SubAssign<&Self> for LBNum {
                 panic!("BigBit integer underflow");
             }
         }
+    }
+}
+impl ops::SubAssign<Self> for LBNum {
+    /// Subtracts an `LBNum` from `self` in place.
+    ///
+    /// # Panics
+    /// Subtraction underflow is undefined for the Linked Bytes format, since it only specifies unsigned integers.
+    #[inline(always)]
+    fn sub_assign(&mut self, rhs: Self) {
+        *self -= &rhs;
     }
 }
 
@@ -173,9 +195,9 @@ macro_rules! impl_sub_with_primitive {
     };
 }
 
-impl_sub_with_primitive!(u8    );
-impl_sub_with_primitive!(u16   );
-impl_sub_with_primitive!(u32   );
-impl_sub_with_primitive!(u64   );
-impl_sub_with_primitive!(u128  );
-impl_sub_with_primitive!(usize );
+impl_sub_with_primitive!(u8   );
+impl_sub_with_primitive!(u16  );
+impl_sub_with_primitive!(u32  );
+impl_sub_with_primitive!(u64  );
+impl_sub_with_primitive!(u128 );
+impl_sub_with_primitive!(usize);
