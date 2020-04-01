@@ -1,6 +1,6 @@
-//! The Linked Bytes format, capable of storing arbitrarily large non-negative integers, also used to efficently store Unicode strings.
+//! The Linked Bytes format, capable of storing arbitrarily large unsigned integers, also used to efficently store Unicode strings.
 //!
-//! If you only want non-negative integers, you should stick to this format. Otherwise, use either Head Byte or Extended Head Byte.
+//! If you only want non-negative integers, you should stick to this format. (Signed LB integers are also planned.) Otherwise, use either Head Byte or Extended Head Byte.
 
 use core::slice::SliceIndex;
 use alloc::vec::Vec;
@@ -9,7 +9,11 @@ use alloc::vec::Vec;
 pub type DecodeResult = Result<LBNum, InvalidLBSequence>;
 
 /// A number in the Linked Bytes format, capable of storing arbitrarily large non-negative integers.
-#[derive(Clone)]
+///
+/// See the [module-level documentation][modlb] for more.
+///
+/// [modlb]: index.html "bigbit::linkedbytes — the Linked Bytes format, capable of storing arbitrarily large non-negative integers, also used to efficently store Unicode strings"
+#[derive(Clone, Debug)]
 pub struct LBNum(pub(crate) LBSequence);
 
 impl LBNum {
@@ -27,6 +31,19 @@ impl LBNum {
     #[inline(always)]
     pub fn increment(&mut self) {
         self.increment_at_index(0);
+    }
+    #[inline(always)]
+    pub fn decrement(&mut self) {
+        assert!(self.checked_decrement())
+    }
+    /// Decrements the value, returning `true` if the decrement did anything and `false` if `self` was zero.
+    #[inline(always)]
+    pub fn checked_decrement(&mut self) -> bool {
+        use crate::ops::linkedbytes::DecrementResult;
+        match self.decrement_at_index(0) {
+            DecrementResult::EndedWithBorrow | DecrementResult::NoSuchIndex => false,
+            DecrementResult::Ok(_) => true
+        }
     }
     #[inline(always)]
     #[must_use]
@@ -105,6 +122,15 @@ impl LBNum {
             if el.is_end() {*el = el.into_linked();}
         }
     }
+
+    /// Removes trailing zeros.
+    pub(crate) fn zero_fold(&mut self) {
+        for i in (0..self.num_bytes()).rev() {
+            if self.0.inner()[i].into_end() == LinkedByte::ZERO_END {
+                self.0.inner_mut().pop();
+            }
+        }
+    }
 }
 impl core::convert::TryFrom<Vec<LinkedByte>> for LBNum {
     type Error = InvalidLBSequence;
@@ -154,6 +180,67 @@ impl core::iter::FromIterator<LinkedByte> for LBNum {
         Self(LBSequence::from(resulting_vec))
     }
 }
+impl core::convert::AsRef<[LinkedByte]> for LBNum {
+    #[inline(always)]
+    fn as_ref(&self) -> &[LinkedByte] {
+        self.0.inner()
+    }
+}
+impl alloc::borrow::Borrow<[LinkedByte]> for LBNum {
+    #[inline(always)]
+    fn borrow(&self) -> &[LinkedByte] {
+        self.0.inner()
+    }
+}
+
+/// A Linked Bytes number behind a reference.
+///
+/// The borrow checker ensures that the inner data will **never** be an invalid LB sequence, meaning that after the `TryFrom` check has passed, there's no way that any external code will tamper the borrowed slice.
+#[derive(Copy, Clone, Debug)]
+pub struct LBNumRef<'a> (&'a [LinkedByte]);
+impl<'a> LBNumRef<'a> {
+    /// Constructs an `LBNumRef` referring to the specified Linked Byte slice.
+    #[inline(always)]
+    pub const fn new(op: &'a [LinkedByte]) -> Self {
+        Self(op)
+    }
+
+    /// Converts an `LBNumRef` into an owned `LBNumRef`. **This dereferences and clones the contents.**
+    #[inline(always)]
+    pub fn into_owned(self) -> LBNum {
+        LBNum::from_sequence(LBSequence::from(self.0))
+    }
+    /// Returns the inner Linked Byte buffer.
+    #[inline(always)]
+    pub const fn inner(self) -> &'a [LinkedByte] {
+        self.0
+    }
+}
+impl<'a> From<&'a LBNum> for LBNumRef<'a> {
+    #[inline(always)]
+    fn from(op: &'a LBNum) -> Self {
+        Self(op.inner().inner())
+    }
+}
+impl<'a> core::convert::TryFrom<&'a [LinkedByte]> for LBNumRef<'a> {
+    type Error = InvalidLBSequence;
+
+    #[inline(always)]
+    fn try_from(op: &'a [LinkedByte]) -> Result<Self, InvalidLBSequence> {
+        if LBNum::check_slice(op) {
+            Ok(Self(op))
+        } else {
+            Err(InvalidLBSequence)
+        }
+    }
+}
+impl<'a> core::ops::Deref for LBNumRef<'a> {
+    type Target = [LinkedByte];
+    fn deref(&self) -> &Self::Target {
+        self.0
+    }
+}
+
 // Implementations for arithmetic operations are located in crate::ops::linkedbytes.
 
 /// Marker error type representing that the decoder has encountered an invalid Linked Bytes sequence, created by the `TryFrom` implementation of `LBNum`.
@@ -163,7 +250,7 @@ impl core::iter::FromIterator<LinkedByte> for LBNum {
 pub struct InvalidLBSequence;
 
 /// An owned unchecked Linked Bytes sequence, used for storing either strings or numbers.
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct LBSequence(pub(crate) Vec<LinkedByte>);
 impl LBSequence {
     /// Creates an empty `LBSequence`.
@@ -254,16 +341,26 @@ impl From<&[LinkedByte]> for LBSequence {
 }
 impl AsRef<[LinkedByte]> for LBSequence {
     #[inline(always)]
-    #[must_use]
     fn as_ref(&self) -> &[LinkedByte] {
         self.0.as_ref()
     }
 }
+impl alloc::borrow::Borrow<[LinkedByte]> for LBSequence {
+    #[inline(always)]
+    fn borrow(&self) -> &[LinkedByte] {
+        &self.0
+    }
+}
 impl AsMut<[LinkedByte]> for LBSequence {
     #[inline(always)]
-    #[must_use]
     fn as_mut(&mut self) -> &mut [LinkedByte] {
         self.0.as_mut()
+    }
+}
+impl alloc::borrow::BorrowMut<[LinkedByte]> for LBSequence {
+    #[inline(always)]
+    fn borrow_mut(&mut self) -> &mut [LinkedByte] {
+        &mut self.0
     }
 }
 impl core::iter::FromIterator<LinkedByte> for LBSequence {
@@ -299,12 +396,21 @@ impl LinkedByte {
     /// The zero value as a linked byte (one or more follow-up bytes expected).
     pub const ZERO_LINK: Self = Self(Self::LINK_MASK);
 
+    /// The smallest value representable, as a `u8`.
+    ///
+    /// Alias for `ZERO_END`.
+    pub const MIN: u8 = 0;
+    /// The largest value representable, as a `u8`.
+    ///
+    /// The value is `127`, since the individual Linked Bytes are 7-bit, plus the link/end flag.
+    pub const MAX: u8 = 127;
+
     /// Returns `true` if the byte is linked to a following byte, `false` otherwise.
     ///
     /// The opposite of `is_end`.
     #[inline(always)]
     #[must_use]
-    pub fn is_linked(self) -> bool {
+    pub const fn is_linked(self) -> bool {
         (self.0 & Self::LINK_MASK) != 0
     }
     /// Returns `true` if the byte is **not** linked to a following byte (i.e. is an endpoint), `false` otherwise.
@@ -312,7 +418,7 @@ impl LinkedByte {
     /// The opposite of `is_linked`.
     #[inline(always)]
     #[must_use]
-    pub fn is_end(self) -> bool {
+    pub const fn is_end(self) -> bool {
         (self.0 & Self::LINK_MASK) == 0
     }
     /// Returns the value of the linked byte, in the range from 0 to 127, inclusively.
@@ -320,20 +426,30 @@ impl LinkedByte {
     /// The main use for this is performing arithmetic with linked bytes.
     #[inline(always)]
     #[must_use]
-    pub fn value(self) -> u8 {
+    pub const fn value(self) -> u8 {
         self.0 & Self::VALUE_MASK
     }
     /// Sets the link bit to `true` (linked state).
     #[inline(always)]
     #[must_use]
-    pub fn into_linked(self) -> Self {
+    pub const fn into_linked(self) -> Self {
         Self(self.0 | Self::ZERO_LINK.0)
+    }
+    /// Converts `self` into the linked state **in place**.
+    #[inline(always)]
+    pub fn make_linked(&mut self) {
+        *self = self.into_linked()
     }
     /// Sets the link bit to `false` (endpoint state).
     #[inline(always)]
     #[must_use]
-    pub fn into_end(self) -> Self {
+    pub const fn into_end(self) -> Self {
         Self(self.0 & Self::VALUE_MASK)
+    }
+    /// Converts `self` into the linked state **in place**.
+    #[inline(always)]
+    pub fn make_end(&mut self) {
+        *self = self.into_end()
     }
     /// Performs checked addition. `None` is returned if the result overflows the limit of 127.
     #[inline]
@@ -348,9 +464,9 @@ impl LinkedByte {
             }
         } else {None}
     }
-    /// Performs checked wrapping addition. Unlike [`checked_add`][0], this method returns a tuple, in which the first value is the result, which wraps over if the result overflows the limit of 127, and the second value is whether the overflow actually occurred.
+    /// Performs checked wrapping addition. Unlike [`checked_add`][ca], this method returns a tuple, in which the first value is the result, which wraps over if the result overflows the limit of 127, and the second value is whether the overflow actually occurred.
     ///
-    /// [0]: #method.checked_add "checked_add — perform checked addition"
+    /// [ca]: #method.checked_add "checked_add — perform checked addition"
     #[inline]
     #[must_use]
     pub fn add_with_carry(self, rhs: Self) -> (Self, bool) {
@@ -384,9 +500,9 @@ impl LinkedByte {
 
     /// Consumes the value and unwraps it into its inner `u8`, retaining the link bit if it's set.
     ///
-    /// Use [`into_int7`][0] if you need only the value without the link bit, which is usually the case.
+    /// Use [`into_int7`][ii7] if you need only the value without the link bit, which is usually the case.
     ///
-    /// [0]: method.into_int7 "into_int7 — consume the value and unwrap it into its inner 7-bit integer"
+    /// [ii7]: method.into_int7 "into_int7 — consume the value and unwrap it into its inner 7-bit integer"
     #[inline(always)]
     #[must_use]
     pub fn into_inner(self) -> u8 {
@@ -394,7 +510,9 @@ impl LinkedByte {
     }
     /// Consumes the value and unwraps it into its inner 7-bit integer, i.e. dropping the link bit if it's set.
     ///
-    /// Use [`into_inner`] if you need the unmodified value with the link bit unmodified.
+    /// Use [`into_inner`][ii] if you need the unmodified value with the link bit unmodified.
+    ///
+    /// [ii]: #method.into_inner "into_inner — consume the value and unwrap it into its inner u8, retaining the link bit if it's set"
     #[inline(always)]
     #[must_use]
     pub fn into_int7(self) -> u8 {

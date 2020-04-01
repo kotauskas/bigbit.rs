@@ -1,13 +1,14 @@
-//! The Head Byte format, capable of storing integers and fractions up to ±1.34078079e+281.
+//! The Head Byte format, capable of storing integers and decimal fractions up to ±1.34078079e+281.
 //!
 //! It's recommended to use this format instead of Extended Head Byte if you're accepting numbers from potentially untrusted locations, since Head Byte imposes a size limit (which is still extremely big, suiting most use cases) while Extended Head Byte does not.
 
-use crate::{Sign, Exponent};
+use crate::Sign;
 use alloc::vec::Vec;
 
-/// The Head Byte format, capable of storing integers and fractions up to ±1.34078079e+281.
+/// The Head Byte format, capable of storing integers and decimal fractions up to ±1.34078079e+281.
 ///
 /// See the [module-level documentation][modhb] for more.
+///
 /// [modhb]: index.html "bigbit::headbyte — the Head Byte format, capable of storing integers and fractions up to ±1.34078079e+281"
 #[derive(Clone)]
 pub struct HBNum {
@@ -221,3 +222,116 @@ impl core::fmt::Debug for HeadByte {
         }
     }
 }
+
+/// An exponent for the Head Byte and Extended Head Byte formats.
+///
+/// To retreive the real value of an \[E\]HB number, its stored value is multiplied by 10 raised to the power of this value as retreived using [`into_inner`][ii].
+///
+/// [ii]: #method.into_inner "into_inner — consumes the value and returns the inner byte"
+///
+/// This is **not** a 2's complement signed number: it ranges from -127 to +127, having one bit as the sign and the rest as a normal 7-bit unsigned integer. As a consequence, it's possible to store `0b1_0000000` as the exponent, meaning a resulting exponent of 10⁻⁰, which is undefined. In most cases, this transformation is unwanted (that is, accidential, most likely happening because of a serious mistake during bitwise operations), and as such is not allowed, producing a `TryFrom` error.
+///
+/// In other words, **protection against `-0` is a safety guarantee**, and actually creating an exponent with this value **requires unsafe code**.
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+pub struct Exponent(u8);
+
+impl Exponent {
+    /// The sign bit mask.
+    ///
+    /// Use [`sign`][0] to easily retreive the sign.
+    ///
+    /// [0]: #method.sign "sign — retreives the sign of the exponent"
+    pub const SIGN_MASK: u8 = 0b1000_0000;
+    pub const ABS_MASK: u8 = !Self::SIGN_MASK;
+
+    /// Wraps a byte into an exponent, ignoring the invalid `0b1_0000000` case.
+    ///
+    /// This is the unsafe unchecked version of the `TryFrom` implementation.
+    ///
+    /// # Safety
+    /// The value must never be `0b1_0000000` (`-0`), since avoiding that case is a safety guaranteee of the `Exponent` type.
+    #[inline(always)]
+    pub unsafe fn from_u8_unchecked(op: u8) -> Self {
+        Self(op)
+    }
+    /// Retreives the sign from the exponent. `Negative` means that the coefficient is multiplied by 10 raised to the power of `-n`, where `n` is the rest of the exponent byte, and `Positive` simply means `10^n`.
+    #[inline(always)]
+    pub fn sign(self) -> Sign {
+        Sign::from((self.0 & Self::SIGN_MASK) != 0)
+    }
+    /// Retreives the absolute value of the exponent, i.e. removes the minus in `10^-n` if it exists.
+    #[inline(always)]
+    #[must_use = "this is not an in-place operation"]
+    pub fn abs(self) -> Self {
+        Self(self.0 & Self::ABS_MASK)
+    }
+    /// Inverts the sign bit of the exponent. `10^2` (`0b0000_0010`) becomes `10^-2` (`0b1000_0010`), `10^127` → `10^-127` and so on.
+    #[inline(always)]
+    #[must_use = "this is not an in-place operation"]
+    pub fn invert(self) -> Self {
+        let sign = !(self.0 & Self::SIGN_MASK);
+        Self((self.0 & Self::ABS_MASK) | sign)
+    }
+
+    #[inline(always)]
+    #[must_use = "this is not an in-place operation"]
+    pub fn checked_mul(self, rhs: Self) -> Option<Self> {
+        if rhs.sign() == self.sign() {
+            let sign = self.0 & Self::SIGN_MASK;
+            if let Some(result) = self.abs().0.checked_add(rhs.abs().0) {
+                Some(Self(sign | result))
+            } else {None}
+
+        } else {
+            self.checked_div(rhs)
+        }
+    }
+    #[inline(always)]
+    #[must_use = "this is not an in-place operation"]
+    fn checked_div(self, rhs: Self) -> Option<Self> {
+        if rhs.sign() == self.sign() {
+            let sign = self.0 & Self::SIGN_MASK;
+            if let Some(result) = self.abs().0.checked_sub(rhs.abs().0) {
+                Some(Self(sign | result))
+            } else {None}
+        } else {
+            self.checked_mul(rhs)
+        }
+    }
+
+    /// Consumes the value and returns the inner byte.
+    ///
+    /// See the struct-level documentation for the meaning of this value.
+    #[inline(always)]
+    #[must_use]
+    pub fn into_inner(self) -> u8 {
+        self.0
+    }
+}
+impl core::convert::TryFrom<u8> for Exponent {
+    type Error = InvalidExponentError;
+    /// Wraps a byte into an exponent.
+    ///
+    /// # Errors
+    /// If the supplied value is `0b1_0000000` (`-0`), `Err(InvalidExponentError)` is returned, where [`InvalidExponentError`][0] is a marker error type.
+    ///
+    /// [0]: struct.InvalidExponentError.html "InvalidExponentError — the error marker for when 0b10000000 is encountered in the TryFrom implementation of Exponent"
+    #[inline(always)]
+    fn try_from(op: u8) -> Result<Self, InvalidExponentError> {
+        if op == 0b1_0000000 {return Err(InvalidExponentError);}
+        Ok(Self(op))
+    }
+}
+impl From<Exponent> for u8 {
+    /// Consumes the exponent and returns the underlying inner byte.
+    #[inline(always)]
+    #[must_use]
+    fn from(op: Exponent) -> Self {
+        op.0
+    }
+}
+/// The error marker for when `0b10000000` is encountered in the `TryFrom` implementation of [`Exponent`][1].
+///
+/// [1]: struct.Exponent.html "Exponent — an exponent for the Head Byte format"
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq)]
+pub struct InvalidExponentError;

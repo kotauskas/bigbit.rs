@@ -26,6 +26,8 @@
 //!
 //! [BigBitStd]: https://github.com/amitguptagwl/BigBit "BitBit specification on GitHub"
 
+#![cfg_attr(feature="clippy", allow(clippy::suspicious_op_assign_impl))] // Fuck this lint, seriously. Whoever wrote "None" in known problems is fucking retarded.
+
 #![no_std]
 extern crate alloc;
 
@@ -35,18 +37,49 @@ pub use headbyte::{HBNum, HeadByte};
 //pub mod extheadbyte;
 //pub use extheadbyte::{EHBNum, ExtHeadByte};
 pub mod linkedbytes;
-pub use linkedbytes::{LBNum, LinkedByte};
+pub use linkedbytes::{LBNum, LBNumRef, LBSequence, LinkedByte};
 
 // This module is dedicated to the implementations of `Ord`, `Eq` and arithmetic operations on the BigBit formats. Please implement these there and only there.
 mod ops;
+mod traits;
+pub use traits::*;
+pub(crate) mod tables; pub(crate) use tables::*;
+
+/// Combined division and remainder operations.
+///
+/// The usual process for getting both the division result and the remainder is performing both operations sequentially, since most programming languages, including Rust, do not provide an interface for introspecting the remainder acquired after dividing with the designated CPU instructions (LLVM will, however, optimize the two operations into one, given that optimizations are actually enabled). With BitBit numbers, however, division is implemented iteratively, without harware acceleration, i.e. the CPU doesn't assist the process by providing special instructions to perform the operations.
+///
+/// The current division implementation simply drops the remainder, which has the cost of deallocating the coefficient/`LinkedByte` sequence, only to allocate and calculate it yet again. By using this trait, you ensure that nothing is ever dropped during division and that you get both the quotient and remainder the fastest way possible.
+pub trait DivRem<Rhs = Self>: Sized {
+    /// The type for the quotient.
+    type Quotient;
+    /// The type for the remainder.
+    type Remainder;
+    /// Performs combined quotient and remainder calculation.
+    ///
+    /// The first element is the quotient, and the second one is the remainder.
+    fn div_rem(self, rhs: Rhs) -> (Self::Quotient, Self::Remainder);
+}
+/// Division in place combined with retreiving the remainder.
+///
+/// This serves the same purpose as the [`DivRem`][dr] trait, but the division is performed in place (the variable/field containing the dividend is replaced by the quotient), and the only value returned is the remainder.
+///
+/// [dr]: trait.DivRem.html "DivRem — combined division and remainder operations"
+pub trait DivRemAssign<Rhs = Self> {
+    /// The type for the remainder.
+    type Remainder;
+    /// Performs combined quotient and remainder calculation, returning the remainder and setting the left operand to the quotient.
+    fn div_rem_assign(&mut self, rhs: Rhs) -> Self::Remainder;
+}
 
 /// The sign of a number.
 ///
 /// Either positive or negative. Zero values in BigBit formats are **always positive**, and `NaN` values are **always negative**.
+#[repr(u8)]
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub enum Sign {
-    Positive,
-    Negative
+    Positive = 0,
+    Negative = 1
 }
 impl From<bool> for Sign {
     /// Treats `true` as negative and `false` as positive.
@@ -75,68 +108,6 @@ impl core::fmt::Display for Sign {
         })
     }
 }
-
-/// An exponent for the Head Byte and Extended Head Byte formats.
-///
-/// To retreive the real value of an [E]HB number, its stored value is multiplied by 10 raised to the power of this value as retreived using [`into_inner`][0].
-///
-/// [0]: #method.into_inner "into_inner — consumes the value and returns the inner byte"
-///
-/// This is **not** a 2's complement signed number: it ranges from -127 to +127, having one bit as the sign and the rest as a normal 7-bit unsigned integer. As a consequence, it's possible to store `0b1_0000000` as the exponent, meaning a resulting exponent of 10⁻⁰, which is undefined. In most cases, this transformation is unwanted (that is, accidential, most likely happening because of a serious mistake during bitwise operations), and as such is not allowed, producing a `TryFrom` error.
-///
-/// In other words, **protection against `-0` is a safety guarantee**, and actually creating an exponent with this value **requires unsafe code**.
-#[derive(Copy, Clone, Debug, PartialEq, Eq)]
-pub struct Exponent(u8);
-
-impl Exponent {
-    /// Wraps a byte into an exponent, ignoring the invalid `0b1_0000000` case.
-    ///
-    /// This is the unsafe unchecked version of the `TryFrom` implementation.
-    ///
-    /// # Safety
-    /// The value must never be `0b1_0000000` (`-0`), since avoiding that case is a safety guaranteee of the `Exponent` type.
-    #[inline(always)]
-    #[must_use]
-    pub unsafe fn from_u8_unchecked(op: u8) -> Self {
-        Self(op)
-    }
-
-    /// Consumes the value and returns the inner byte.
-    ///
-    /// See the struct-level documentation for the meaning of this value.
-    #[inline(always)]
-    #[must_use]
-    pub fn into_inner(self) -> u8 {
-        self.0
-    }
-}
-impl core::convert::TryFrom<u8> for Exponent {
-    type Error = InvalidExponentError;
-    /// Wraps a byte into an exponent.
-    ///
-    /// # Errors
-    /// If the supplied value is `0b1_0000000` (`-0`), `Err(InvalidExponentError)` is returned, where [`InvalidExponentError`][0] is a marker error type.
-    ///
-    /// [0]: struct.InvalidExponentError.html "InvalidExponentError — the error marker for when 0b10000000 is encountered in the TryFrom implementation of Exponent"
-    #[inline(always)]
-    fn try_from(op: u8) -> Result<Self, InvalidExponentError> {
-        if op == 0b1_0000000 {return Err(InvalidExponentError);}
-        Ok(Self(op))
-    }
-}
-impl From<Exponent> for u8 {
-    /// Consumes the exponent and returns the underlying inner byte.
-    #[inline(always)]
-    #[must_use]
-    fn from(op: Exponent) -> Self {
-        op.0
-    }
-}
-/// The error marker for when `0b10000000` is encountered in the `TryFrom` implementation of [`Exponent`][1].
-///
-/// [1]: struct.Exponent.html "Exponent — an exponent for the Head Byte format"
-#[derive(Copy, Clone, Debug, Default, PartialEq, Eq)]
-pub struct InvalidExponentError;
 
 /// This is a hack to get around the fact that `debug_struct` only accepts `Debug` formatting rather than `Display`, which becomes a verbosity issue if the values of an enum are known from the name of the field.
 #[derive(Copy, Clone, PartialEq, Eq)]

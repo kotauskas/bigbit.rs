@@ -1,4 +1,4 @@
 // Uncomment when implementing arithmetics for these
-//mod headbyte;
-//mod extheadbyte;
-mod linkedbytes;
+//pub(crate) mod headbyte;
+//pub(crate) mod extheadbyte;
+pub(crate) mod linkedbytes;
