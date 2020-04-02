@@ -13,11 +13,12 @@ use alloc::vec::Vec;
 #[derive(Clone)]
 pub struct HBNum {
     hb: HeadByte,
-    followup: Vec<u8>
+    exponent: Option<Exponent>,
+    coefficients: Vec<u8>
 }
 impl HBNum {
-    pub fn from_headbyte_and_followup(hb: HeadByte, followup: Vec<u8>) -> Result<Self, ()> {
-        if hb.has_exponent() && followup.len() < 2 {Err(())} else {Ok(Self {hb, followup})}
+    pub fn from_raw_parts(hb: HeadByte, exponent: Option<Exponent>, coefficients: Vec<u8>) -> Self {
+        Self {hb, exponent, coefficients}
     }
 
     /// Returns the head byte.
@@ -29,22 +30,16 @@ impl HBNum {
         self.hb
     }
     /// Returns the exponent, or `None` if it's not used (mainly the case for integers).
-    #[inline]
+    #[inline(always)]
     #[must_use]
     pub fn exponent(&self) -> Option<Exponent> {
-        if self.hb.has_exponent() {
-            unsafe {Some( Exponent::from_u8_unchecked(*self.followup.get_unchecked(0)) )}
-        } else {None}
+        self.exponent
     }
 
     /// Returns an iterator over the coefficients in little endian byte order.
-    #[inline]
+    #[inline(always)]
     pub fn coefficient_le_iter(&self) -> impl Iterator<Item = u8> + DoubleEndedIterator + '_ {
-        if self.headbyte().has_exponent() {
-            self.followup[1..].iter()
-        } else {
-            self.followup.iter()
-        }.copied()
+        self.coefficients.iter().copied()
     }
     /// Returns an iterator over the coefficients in big endian byte order.
     #[inline(always)]

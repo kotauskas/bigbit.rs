@@ -84,6 +84,11 @@ macro_rules! impl_add_with_primitive {
             #[inline(always)]
             fn add(mut self, rhs: $ty) -> Self {self += rhs; self}
         }
+        impl core::ops::Add<LBNum> for $ty {
+            type Output = LBNum;
+            #[inline(always)]
+            fn add(self, rhs: LBNum) -> LBNum {rhs + self} // Since addition is commutative, we can just switch the operands around
+        }                                                  // and it's going to work automagically.
         impl core::ops::AddAssign<$ty> for LBNum {
             fn add_assign(&mut self, rhs: $ty) {
                 if self.0.inner().get(0).is_none() {
@@ -100,6 +105,15 @@ macro_rules! impl_add_with_primitive {
                 let (val, wrapped) = self.0.inner_mut()[0].add_with_carry(LinkedByte::from(rem));
                 if wrapped {self.increment_at_index(1);}
                 *self.0.get_mut(0).unwrap_or_else(||{unsafe{core::hint::unreachable_unchecked()}}) = val;
+            }
+        }
+        impl ops::AddAssign<LBNum> for $ty {
+            fn add_assign(&mut self, rhs: LBNum) {
+                if let Ok(val) = TryInto::<$ty>::try_into(*self + rhs) {
+                    *self = val;
+                } else {
+                    panic!("integer overflow while adding a BigBit number to a primitive integer");
+                }
             }
         }
     };

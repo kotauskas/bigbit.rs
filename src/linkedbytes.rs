@@ -249,6 +249,12 @@ impl<'a> core::ops::Deref for LBNumRef<'a> {
 #[derive(Copy, Clone, Debug, Default, PartialEq, Eq)]
 pub struct InvalidLBSequence;
 
+// /// A Unicode string stored using the Linked Bytes format.
+// ///
+// /// This is more compact than all of the current UTF formats (namely, UTF-1, 7, 8, 16, let alone 32), since no surrogate pairs are used. Instead, the Linked Bytes format is leveraged, with separate codepoints being stored as individual Linked Bytes numbers. Both the link/end bits of the bytes and length of the entire message, either via the null terminator (which still works since a linking 0 has the most significant bit set to 1 and cannot be confused with the null terminator when reinterpreted as `u8`) or via storing it separately (as Rust `String`s do), are available. This means that the UTF-32 number of each codepoint can be encoded using the usual Linked Bytes format, with the link bit cleared in a byte indicating that one character has ended and a new one is coming next.
+// #[derive(Clone, Debug)]
+// pub struct LBString(LBSequence);
+
 /// An owned unchecked Linked Bytes sequence, used for storing either strings or numbers.
 #[derive(Clone, Debug)]
 pub struct LBSequence(pub(crate) Vec<LinkedByte>);
