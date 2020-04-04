@@ -24,6 +24,9 @@
 //! - **Tests** (planned for 0.1.0 but might be partially added earlier)
 //!
 //! # Changelog
+//! ## 0.0.6
+//! - Added `LBString`, which is an owned string type implementing the Linked Bytes Unicode encoding, allowing for efficient storage of Unicode strings which is under all circumstances more compact than all current UTF encodings
+//! - Added `LBNumRef` addition, which was missing due to a copypasting mistake
 //! ## 0.0.5
 //! - Implemented arithmetic with `self` as the right operand for Linked Bytes, removing the need to always explicitly write `op1 + &op2` (same for other operators)
 //! - Fixed the Crates.io badge to link to `bigbit` instead of `bi`**`t`**`bit`
@@ -61,7 +64,7 @@ pub use headbyte::{HBNum, HeadByte};
 //pub mod extheadbyte;
 //pub use extheadbyte::{EHBNum, ExtHeadByte};
 pub mod linkedbytes;
-pub use linkedbytes::{LBNum, LBNumRef, LBSequence, LinkedByte};
+pub use linkedbytes::{LBNum, LBNumRef, LBString, LBSequence, LinkedByte};
 
 // This module is dedicated to the implementations of `Ord`, `Eq` and arithmetic operations on the BigBit formats. Please implement these there and only there.
 mod ops;

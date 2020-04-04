@@ -3,7 +3,7 @@
 //! If you only want non-negative integers, you should stick to this format. (Signed LB integers are also planned.) Otherwise, use either Head Byte or Extended Head Byte.
 
 use core::slice::SliceIndex;
-use alloc::vec::Vec;
+use alloc::{vec::Vec, string::String};
 
 /// The `Result` specialization for the methods converting iterators/arrays of bytes into instances of `LBNum`.
 pub type DecodeResult = Result<LBNum, InvalidLBSequence>;
@@ -32,9 +32,22 @@ impl LBNum {
     pub fn increment(&mut self) {
         self.increment_at_index(0);
     }
+    /// Decrements the value.
+    ///
+    /// # Panics
+    /// If the value was 0, a panic is produced. Use [`checked_decrement`][cd] to properly handle such a situation.
+    ///
+    /// [cd]: #method.checked_decrement "checked_decrement — decrements the value, returning true if the decrement did anything and false if the value was zero"
     #[inline(always)]
     pub fn decrement(&mut self) {
         assert!(self.checked_decrement())
+    }
+    /// Converts the number into 0 without deallocating memory.
+    ///
+    /// This is useful for buffers used for converting a collection of primitive integers into derivatives of `LBNum`, namely in the `FromIterator` implementation of `LBString`.
+    #[inline(always)]
+    pub fn make_zero(&mut self) {
+        self.0.inner_mut().clear();
     }
     /// Decrements the value, returning `true` if the decrement did anything and `false` if `self` was zero.
     #[inline(always)]
@@ -45,6 +58,9 @@ impl LBNum {
             DecrementResult::Ok(_) => true
         }
     }
+    /// Returns an immutable reference to the inner sequence.
+    ///
+    /// Use this to locate bytes at arbitrary indicies.
     #[inline(always)]
     #[must_use]
     pub const fn inner(&self) -> &LBSequence {
@@ -205,6 +221,27 @@ impl<'a> LBNumRef<'a> {
         Self(op)
     }
 
+    /// Returns the number of bytes in the number.
+    #[inline(always)]
+    pub fn len(self) -> usize {
+        self.0.len()
+    }
+    /// Returns `true` if the number is 0, `false` otherwise.
+    #[inline(always)]
+    pub fn is_empty(self) -> bool {
+        self.0.is_empty()
+    }
+    /// Returns a by-value iterator over the linked bytes, **in little endian byte order.**
+    #[inline(always)]
+    pub fn iter_le(self) -> impl Iterator<Item = LinkedByte> + DoubleEndedIterator + 'a {
+        self.0.iter().copied()
+    }
+    /// Returns a by-value iterator over the linked bytes, **in big endian byte order.**
+    #[inline(always)]
+    pub fn iter_be(self) -> impl Iterator<Item = LinkedByte> + DoubleEndedIterator + 'a {
+        self.iter_le().rev()
+    }
+
     /// Converts an `LBNumRef` into an owned `LBNumRef`. **This dereferences and clones the contents.**
     #[inline(always)]
     pub fn into_owned(self) -> LBNum {
@@ -249,11 +286,139 @@ impl<'a> core::ops::Deref for LBNumRef<'a> {
 #[derive(Copy, Clone, Debug, Default, PartialEq, Eq)]
 pub struct InvalidLBSequence;
 
-// /// A Unicode string stored using the Linked Bytes format.
-// ///
-// /// This is more compact than all of the current UTF formats (namely, UTF-1, 7, 8, 16, let alone 32), since no surrogate pairs are used. Instead, the Linked Bytes format is leveraged, with separate codepoints being stored as individual Linked Bytes numbers. Both the link/end bits of the bytes and length of the entire message, either via the null terminator (which still works since a linking 0 has the most significant bit set to 1 and cannot be confused with the null terminator when reinterpreted as `u8`) or via storing it separately (as Rust `String`s do), are available. This means that the UTF-32 number of each codepoint can be encoded using the usual Linked Bytes format, with the link bit cleared in a byte indicating that one character has ended and a new one is coming next.
-// #[derive(Clone, Debug)]
-// pub struct LBString(LBSequence);
+/// A Unicode string stored using the Linked Bytes format.
+///
+/// This is more compact than all of the current UTF formats (namely, UTF-1, 7, 8, 16, let alone 32), since no surrogate pairs are used. Instead, the Linked Bytes format is leveraged, with separate codepoints being stored as individual Linked Bytes numbers. Both the link/end bits of the bytes and length of the entire message, either via the null terminator (which still works since a linking 0 has the most significant bit set to 1 and cannot be confused with the null terminator when reinterpreted as `u8`) or via storing it separately (as Rust `String`s do), are available. This means that the UTF-32 number of each codepoint can be encoded using the usual Linked Bytes format, with the link bit cleared in a byte indicating that one character has ended and a new one is coming next.
+///
+/// # Usage
+/// Conversion from `String` or `&str`:
+/// ```
+/// # extern crate alloc;
+/// # use alloc::string::String;
+/// # use bigbit::LBString;
+/// static MY_STRING: &str = "My string!";
+/// let stdstring = String::from("This is a standard string!");
+///
+/// let my_string_lb = LBString::from(MY_STRING); // Creates an LBString from a string slice
+/// let stdstring_lb = LBString::from(stdstring); // Creates an LBString from a String
+/// let my_string_lb_2 = MY_STRING.chars().collect::<LBString>(); // Creates an LBString from an iterator
+///
+/// # assert_eq!(String::from(my_string_lb), MY_STRING);
+/// # assert_eq!(String::from(stdstring_lb), "This is a standard string!");
+/// # assert_eq!(String::from(my_string_lb_2), MY_STRING);
+/// ```
+#[derive(Clone, Debug)]
+pub struct LBString(LBSequence);
+impl LBString {
+    /// Returns an iterator over the codepoints in the string.
+    ///
+    /// This is the core method of this type. Most other methods use this to perform more complex operations, such as conversion from an `&str`.
+    #[inline(always)]
+    pub fn chars(&self) -> impl Iterator<Item = char> + '_ {
+        LBCharsIter::new(self)
+    }
+
+    /// Returns an immutable reference to the underlying sequence.
+    #[inline(always)]
+    pub fn inner(&self) -> &LBSequence {
+        &self.0
+    }
+}
+impl core::iter::FromIterator<char> for LBString {
+    fn from_iter<I: IntoIterator<Item = char>>(iter: I) -> Self {
+        let mut result = Self(LBSequence::empty());
+        let mut lbn = LBNum::ZERO;
+        for c in iter.into_iter() {
+            lbn.make_zero(); // This is a specialized method for making the value zero without reallocating,
+                             // which makes it vital for larger strings.
+            lbn += u32::from(c);
+            result.0.inner_mut().extend(lbn.iter_le());
+        }
+        result
+    }
+}
+impl<'a> core::iter::FromIterator<&'a char> for LBString {
+    /// Convenience implementation for collections which iterate over references to items rather than the items themselves, to avoid repetitive `.copied()` in calling code.
+    #[inline(always)]
+    fn from_iter<I: IntoIterator<Item = &'a char>>(iter: I) -> Self {
+        iter.into_iter().copied().collect::<Self>()
+    }
+}
+impl From<&String> for LBString {
+    #[inline(always)]
+    fn from(op: &String) -> Self {
+        op.chars().collect::<Self>()
+    }
+}
+impl From<String> for LBString {
+    #[inline(always)]
+    fn from(op: String) -> Self {
+        op.chars().collect::<Self>()
+    }
+}
+impl<'a> From<&'a str> for LBString {
+    #[inline(always)]
+    fn from(op: &'a str) -> Self {
+        op.chars().collect::<Self>()
+    }
+}
+impl From<LBString> for String {
+    #[inline(always)]
+    fn from(op: LBString) -> Self {
+        op.chars().collect::<Self>()
+    }
+}
+impl core::fmt::Display for LBString {
+    fn fmt(&self, f: &mut core::fmt::Formatter) -> core::fmt::Result {
+        use core::fmt::Write;
+        for c in self.chars() {
+            if let Err(e) = f.write_char(c) {return Err(e);} // Stop right where we are if we can't write anything.
+        }
+        Ok(())
+    }
+}
+/// An iterator over the codepoints in an `LBString`.
+///
+/// This resolves the codepoints on the fly, as all lazy iterators do. Thus creating such an iterator is totally free.
+///
+/// The values are **not checked when resolving,** meaning that any invalid Unicode codepoints will be carried over into the result. The reason is that the validity of the values is ensured by the `LBString` type during creation. This means that any unsafe code introspecting an `LBString` will most likely trigger a panic or an infinite loop.
+pub struct LBCharsIter<'a> {
+    inner: &'a LBString,
+    index: usize
+}
+impl<'a> LBCharsIter<'a> {
+    pub fn new(s: &'a LBString) -> Self {
+        Self {inner: s, index: 0}
+    }
+}
+impl<'a> Iterator for LBCharsIter<'a> {
+    type Item = char;
+    fn next(&mut self) -> Option<char> { // If anything breaks, blame this tymethod (seriously, please do).
+        use core::{convert::TryInto, hint::unreachable_unchecked};
+        let mut chosen_range = self.index..self.index;
+        loop {
+            if let Some(v) = self.inner.inner().get(self.index) {
+                self.index += 1;
+                chosen_range.end = self.index;
+                if v.is_end() {break;}
+            } else {
+                return None;
+            }
+        }
+        // inner inner inner inner inner inner inner inner inner inner inner inner inner inner inner inner inner inner inner inner inner inner inner inner inner
+        // inner inner inner inner inner inner inner inner inner inner inner inner inner inner inner inner inner inner inner inner inner inner inner inner inner
+        // inner inner inner inner inner inner inner inner inner inner inner inner inner inner inner inner inner inner inner inner inner inner inner inner inner
+        // inner inner inner inner inner inner inner inner inner inner inner inner inner inner inner inner inner inner inner inner inner inner inner inner inner
+        let refnum = TryInto::<LBNumRef>::try_into(&self.inner.inner().inner()[chosen_range])
+            .unwrap_or_else(|_| unsafe {unreachable_unchecked()}); // Value validity is a safety guarantee for LBString, which is why we can simply
+                                                                   // invoke UB if it fails. Great!
+        let codepoint = TryInto::<u32>::try_into(refnum)
+            .unwrap_or_else(|_| unsafe {unreachable_unchecked()}); // Same thing here.
+        let codepoint = TryInto::<char>::try_into(codepoint)
+            .unwrap_or_else(|_| unsafe {unreachable_unchecked()}); // And here.
+        Some(codepoint)
+    }
+}
 
 /// An owned unchecked Linked Bytes sequence, used for storing either strings or numbers.
 #[derive(Clone, Debug)]

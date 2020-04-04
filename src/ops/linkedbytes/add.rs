@@ -1,4 +1,4 @@
-use crate::{LBNum, LinkedByte};
+use crate::{LBNum, LBNumRef, LinkedByte};
 use core::{ops, convert::TryInto};
 
 impl LBNum {
@@ -46,16 +46,35 @@ impl ops::Add<Self> for LBNum {
         self + &rhs
     }
 }
+impl ops::Add<LBNumRef<'_>> for LBNum {
+    type Output = Self;
+
+    #[inline(always)]
+    fn add(mut self, rhs: LBNumRef<'_>) -> Self {
+        self += rhs;
+        self
+    }
+}
 impl ops::AddAssign<&Self> for LBNum {
+    #[inline(always)]
     fn add_assign(&mut self, rhs: &Self) {
-        if rhs.0.inner().is_empty() {return;}
-        if self.0.len() < rhs.0.len() {
-            self.convert_last_to_linked();
-            self.0.inner_mut().resize(rhs.0.len(), LinkedByte::ZERO_LINK);
-            self.ensure_last_is_end();
+        *self += LBNumRef::from(rhs)
+    }
+}
+impl ops::AddAssign<Self> for LBNum {
+    #[inline(always)]
+    fn add_assign(&mut self, rhs: Self) {
+        *self += &rhs;
+    }
+}
+impl ops::AddAssign<LBNumRef<'_>> for LBNum {
+    fn add_assign(&mut self, rhs: LBNumRef<'_>) {
+        if rhs.is_empty() {return;}
+        if self.0.len() < rhs.len() {
+            self.0.inner_mut().resize(rhs.len(), LinkedByte::ZERO_LINK);
         }
         // Create a pair iterator. For every value of this, other is its corresponding value from rhs.
-        for (i, other) in (0..self.0.len()).zip(rhs.0.iter_le()) {
+        for (i, other) in (0..self.0.len()).zip(rhs.iter_le()) {
             let this = &mut self.0.inner_mut()[i];
             let (val, wrapped) = this.add_with_carry(other);
             *this = val;
@@ -69,11 +88,7 @@ impl ops::AddAssign<&Self> for LBNum {
                 }
             }
         }
-    }
-}
-impl ops::AddAssign<Self> for LBNum {
-    fn add_assign(&mut self, rhs: Self) {
-        *self += &rhs;
+        Self::fix_in_place(self.0.inner_mut());
     }
 }
 
@@ -108,6 +123,7 @@ macro_rules! impl_add_with_primitive {
             }
         }
         impl ops::AddAssign<LBNum> for $ty {
+            #[inline]
             fn add_assign(&mut self, rhs: LBNum) {
                 if let Ok(val) = TryInto::<$ty>::try_into(*self + rhs) {
                     *self = val;
