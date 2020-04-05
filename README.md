@@ -28,6 +28,11 @@ And here's a list of what's not finished just yet:
 - **Tests** (planned for 0.1.0 but might be partially added earlier)
 
 ## Changelog
+### 0.0.7
+- Implemented some traits for `LBString`s, allowing for quick conversion to and from `String`s
+### 0.0.6
+- Added `LBString`, which is an owned string type implementing the Linked Bytes Unicode encoding, allowing for efficient storage of Unicode strings which is under all circumstances more compact than all current UTF encodings
+- Added `LBNumRef` addition, which was missing due to a copypasting mistake
 ### 0.0.5
 - Implemented arithmetic with `self` as the right operand for Linked Bytes, removing the need to always explicitly write `op1 + &op2` (same for other operators)
 - Fixed the Crates.io badge to link to `bigbit` instead of `bi`**`t`**`bit`

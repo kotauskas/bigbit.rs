@@ -2,8 +2,8 @@
 //!
 //! If you only want non-negative integers, you should stick to this format. (Signed LB integers are also planned.) Otherwise, use either Head Byte or Extended Head Byte.
 
-use core::slice::SliceIndex;
-use alloc::{vec::Vec, string::String};
+use core::{slice::SliceIndex, cmp::Ordering};
+use alloc::vec::Vec;
 
 /// The `Result` specialization for the methods converting iterators/arrays of bytes into instances of `LBNum`.
 pub type DecodeResult = Result<LBNum, InvalidLBSequence>;
@@ -318,6 +318,18 @@ impl LBString {
         LBCharsIter::new(self)
     }
 
+    /// Counts the number of **codepoints** stored.
+    ///
+    /// This will iterate through the entire string and count how many codepoints were resolved successfully. Currently, this is implemented as simply `self.chars().count()`.
+    #[inline(always)]
+    pub fn len(&self) -> usize {
+        self.chars().count()
+    }
+    /// Returns `true` if there are no codepoints stored, `false` otherwise.
+    #[inline(always)]
+    pub fn is_empty(&self) -> bool {
+        self.0.is_empty() // We can use the container length, since if it's 0, then it's pointless to try to iterate, otherwise there's guaranteed to be a codepoint.
+    }
     /// Returns an immutable reference to the underlying sequence.
     #[inline(always)]
     pub fn inner(&self) -> &LBSequence {
@@ -342,30 +354,6 @@ impl<'a> core::iter::FromIterator<&'a char> for LBString {
     #[inline(always)]
     fn from_iter<I: IntoIterator<Item = &'a char>>(iter: I) -> Self {
         iter.into_iter().copied().collect::<Self>()
-    }
-}
-impl From<&String> for LBString {
-    #[inline(always)]
-    fn from(op: &String) -> Self {
-        op.chars().collect::<Self>()
-    }
-}
-impl From<String> for LBString {
-    #[inline(always)]
-    fn from(op: String) -> Self {
-        op.chars().collect::<Self>()
-    }
-}
-impl<'a> From<&'a str> for LBString {
-    #[inline(always)]
-    fn from(op: &'a str) -> Self {
-        op.chars().collect::<Self>()
-    }
-}
-impl From<LBString> for String {
-    #[inline(always)]
-    fn from(op: LBString) -> Self {
-        op.chars().collect::<Self>()
     }
 }
 impl core::fmt::Display for LBString {
@@ -731,15 +719,13 @@ impl core::fmt::Debug for LinkedByte {
         ds.finish()
     }
 }
-
-use core::cmp::{self, Ordering};
-impl cmp::PartialOrd for LinkedByte {
+impl PartialOrd for LinkedByte {
     #[inline(always)]
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
         Some(self.cmp(other))
     }
 }
-impl cmp::Ord for LinkedByte {
+impl Ord for LinkedByte {
     #[inline(always)]
     fn cmp(&self, other: &Self) -> Ordering {
         self.into_end().0.cmp(&other.into_end().0)
