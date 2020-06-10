@@ -68,8 +68,6 @@ pub use headbyte::{HBNum, HeadByte};
 pub mod linkedbytes;
 pub use linkedbytes::{LBNum, LBNumRef, LBString, LBSequence, LinkedByte};
 
-// This module is dedicated to the implementations of `Ord`, `Eq` and arithmetic operations on the BigBit formats. Please implement these there and only there.
-mod ops;
 mod traits;
 pub use traits::*;
 pub(crate) mod tables; pub(crate) use tables::*;

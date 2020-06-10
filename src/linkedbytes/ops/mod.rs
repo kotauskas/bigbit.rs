@@ -2,8 +2,7 @@ use crate::{LBNum, LBNumRef};
 use core::cmp::{self, Ordering};
 
 mod add; mod sub; mod mul; mod div; mod from; mod tryinto; mod fmt;
-#[allow(unused_imports)]
-pub(crate) use {add::*, sub::*, mul::*, div::*, from::*, tryinto::*, fmt::*};
+pub(crate) use sub::DecrementResult;
 
 impl cmp::PartialEq for LBNum {
     #[inline(always)]

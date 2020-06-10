@@ -2,6 +2,8 @@
 //!
 //! It's recommended to use this format instead of Extended Head Byte if you're accepting numbers from potentially untrusted locations, since Head Byte imposes a size limit (which is still extremely big, suiting most use cases) while Extended Head Byte does not.
 
+mod ops;
+
 use crate::Sign;
 use alloc::vec::Vec;
 

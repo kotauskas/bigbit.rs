@@ -1,4 +1,4 @@
-use crate::{LBNum, LinkedByte};
+use crate::{LBNum, LBNumRef, LinkedByte};
 use core::{ops, convert::TryInto};
 
 impl LBNum {
@@ -21,20 +21,20 @@ impl LBNum {
     /// Performs checked subtraction. Returns `None` if the result underflowed 0, or the result wrapped in `Some` otherwise.
     #[inline(always)]
     pub fn checked_sub(mut self, rhs: &Self) -> Option<Self> {
-        unsafe{ if !self.checked_sub_assign(rhs) {Some(self)} else {None} }
+        unsafe{ if !self.checked_sub_assign(rhs.into()) {Some(self)} else {None} }
     }
     /// Performs checked subtraction, returning `true` if overflow occurred.
     ///
     /// # Safety
     /// If `true` is returned, the value of `self` is undefined.
-    pub(crate) unsafe fn checked_sub_assign(&mut self, rhs: &Self) -> bool {
-        if rhs.0.inner().is_empty() {return true;}
+    pub(crate) unsafe fn checked_sub_assign(&mut self, rhs: LBNumRef<'_>) -> bool {
+        if rhs.is_empty() {return true;}
         if self.0.len() < rhs.0.len() {
             self.convert_last_to_linked();
             self.0.inner_mut().resize(rhs.0.len(), LinkedByte::ZERO_LINK);
             self.ensure_last_is_end();
         }
-        for (i, other) in (0..self.0.len()).zip(rhs.0.iter_le()) {
+        for (i, other) in (0..self.0.len()).zip(rhs.iter_le()) {
             let this = &mut self.0.inner_mut()[i];
             let (val, wrapped) = this.sub_with_borrow(other);
             *this = val;
@@ -105,7 +105,7 @@ impl ops::SubAssign<&Self> for LBNum {
     #[inline(always)]
     fn sub_assign(&mut self, rhs: &Self) {
         unsafe {
-            if !self.checked_sub_assign(rhs) {
+            if !self.checked_sub_assign(rhs.into()) {
                 panic!("BigBit integer underflow");
             }
         }

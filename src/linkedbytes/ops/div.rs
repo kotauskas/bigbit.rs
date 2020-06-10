@@ -39,7 +39,7 @@ impl DivRemAssign<&Self> for LBNum {
         let mut quotient = Self::ZERO;
         loop {
             if (self as &Self) < rhs {break;}
-            unsafe {self.checked_sub_assign(&rhs);}
+            unsafe {self.checked_sub_assign(rhs.into());}
             quotient.increment();
         }
         core::mem::replace(self, quotient) // This moves the remainder out of self, moves the quotient and tail-returns it to the callee.
@@ -57,6 +57,26 @@ impl DivRemAssign<Self> for LBNum {
     #[inline(always)]
     fn div_rem_assign(&mut self, rhs: Self) -> Self {
         self.div_rem_assign(&rhs)
+    }
+}
+impl DivRemAssign<LBNumRef<'_>> for LBNum {
+    type Remainder = Self;
+
+    /// Performs in-place integer division combined with returning the remainder.
+    ///
+    /// # Panics
+    /// Dividing by 0 triggers an immediate panic.
+    fn div_rem_assign(&mut self, rhs: LBNumRef<'_>) -> Self {
+        assert!(rhs > 0u8);
+        let mut quotient = Self::ZERO;
+        loop {
+            if *self < rhs {break;}
+            unsafe {self.checked_sub_assign(rhs);}
+            quotient.increment();
+        }
+        core::mem::replace(self, quotient) // This moves the remainder out of self, moves the quotient and tail-returns it to the callee.
+                                           // While this kind of call might indeed be unintuitive, reading the core::mem::replace docs is
+                                           // all you need to do to understand this just fine.
     }
 }
 impl ops::Div<&Self> for LBNum {
@@ -175,7 +195,7 @@ macro_rules! impl_div_by_primitive {
                 let mut quotient = Self::ZERO;
                 loop {
                     if (self as &Self) < &rhs {break;}
-                    unsafe {self.checked_sub_assign(&LBNum::from(rhs));}
+                    unsafe {self.checked_sub_assign(LBNum::from(rhs).borrow());}
                     quotient.increment();
                 }
                 core::mem::replace(self, quotient)
@@ -199,7 +219,7 @@ macro_rules! impl_div_by_primitive {
                 let mut result = Self::ZERO;
                 loop {
                     if (self as &Self) < &rhs {break;}
-                    unsafe {self.checked_sub_assign(&LBNum::from(rhs));}
+                    unsafe {self.checked_sub_assign(LBNum::from(rhs).borrow());}
                     result.increment();
                 }
                 *self = result;
