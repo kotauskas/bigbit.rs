@@ -1,4 +1,4 @@
-use crate::{LBNum, LBNumRef, LinkedByte};
+use crate::linkedbytes::{LBNum, LBNumRef, LinkedByte};
 use core::{ops, convert::TryInto};
 
 impl LBNum {

@@ -1,4 +1,4 @@
-use crate::{LBNum, linkedbytes::LBNumRef, POWERS_OF_128};
+use crate::{linkedbytes::{LBNum, LBNumRef}, POWERS_OF_128};
 use core::{convert::TryFrom};
 
 macro_rules! impl_from_lb_for_primitive {

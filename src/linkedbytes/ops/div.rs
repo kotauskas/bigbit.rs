@@ -1,4 +1,7 @@
-use crate::{LBNum, LBNumRef, DivRem, DivRemAssign};
+use crate::{
+    linkedbytes::{LBNum, LBNumRef},
+    DivRem, DivRemAssign,
+};
 use core::ops;
 
 impl DivRem<&Self> for LBNum {
