@@ -24,36 +24,10 @@
 //! - **Tests** (planned for 0.1.0 but might be partially added earlier)
 //!
 //! # Changelog
-//! ## 0.0.7
-//! - Implemented some traits for `LBString`s, allowing for quick conversion to and from `String`s
-//! ## 0.0.6
-//! - Added `LBString`, which is an owned string type implementing the Linked Bytes Unicode encoding, allowing for efficient storage of Unicode strings which is under all circumstances more compact than all current UTF encodings
-//! - Added `LBNumRef` addition, which was missing due to a copypasting mistake
-//! ## 0.0.5
-//! - Implemented arithmetic with `self` as the right operand for Linked Bytes, removing the need to always explicitly write `op1 + &op2` (same for other operators)
-//! - Fixed the Crates.io badge to link to `bigbit` instead of `bi`**`t`**`bit`
-//! - Added `usize` to the list of primitive integer types for which Linked Bytes arithmetic is implemented
-//! - Added the `DivRem` and `DivRemAssign` traits for combined division (one operation to get the quotient and remainder)
-//! - Renamed `HeadByte::from_headbyte_and_followup` into `from_raw_parts` ***(breaking)***
-//! - Implemented logarithm with arbitrary base for Linked Bytes
-//! - Implemented string formatting for Linked Bytes
-//!
-//! ## 0.0.4
-//! - Implemented Linked Bytes multiplication and division
-//! - Implemented Linked Bytes arithmetic with primitive integers
-//! - Reorganized the internal module structure
-//! - Added `LBNumRef`
-//! - Implemented some more traits on `LBNum`
-//!
-//! ## 0.0.3
-//! - Implemented Linked Bytes subtraction
-//! - Started the reorganization
-//! - Fixed addition bugs
-//!
-//!
-//! If you're wondering why all versions until `0.0.3` are yanked, these had a minor LB addition bug, so please upgrade if you haven't already.
+//! The full version history can be found [here][changelog].
 //!
 //! [BigBitStd]: https://github.com/amitguptagwl/BigBit "BitBit specification on GitHub"
+//! [changelog]: https://github.com/kotauskas/bigbit.rs/releases " "
 
 #![cfg_attr(feature="clippy", allow(clippy::suspicious_op_assign_impl))] // Fuck this lint, seriously. Whoever wrote "None" in known problems is fucking retarded.
 
