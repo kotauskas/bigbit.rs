@@ -73,6 +73,22 @@ pub trait DivRemAssign<Rhs = Self> {
     fn div_rem_assign(&mut self, rhs: Rhs) -> Self::Remainder;
 }
 
+/// Calculating the greatest common divisor.
+///
+/// The exact signature of this trait is designed specifically for BigBit types (or any other integer types which own a memory allocation, for that matter), in that it takes both operands by value. For `Copy` types this is nothing other than an advantage; for the memory allocated integer types we're dealing here, it's a matter of cloning the numbers before the operation.
+///
+/// Until specialization becomes stable, not implementing this trait transitively is a logic error rather than a scenario which is protected against by a default blanket implementation. **In short, if you implement `Gcd<U>` for type `T`, you need to also implement `Gcd<T>` for `U`. It's a viable option to do that by writing an `#[inline(always)]` shim which calls `T::gcd(value_of_u)`.
+///
+/// **Implementing this trait for types outside of the `bigbit` crate is greatly discouraged.** Use non-trait methods or third-party traits for those purposes.
+pub trait Gcd<Rhs = Self>: Sized {
+    /// Performs the calculation of the greatest common divisor.
+    ///
+    /// Most implementations use the [Euclidean algorithm][0] for this.
+    ///
+    /// [0]: https://en.wikipedia.org/wiki/Euclidean_algorithm "Euclidean Algorithm on Wikipedia"
+    fn gcd(lhs: Self, rhs: Rhs) -> Self;
+}
+
 /// The sign of a number.
 ///
 /// Either positive or negative. Zero values in BigBit formats are **always positive**, and `NaN` values are **always negative**.
@@ -80,7 +96,7 @@ pub trait DivRemAssign<Rhs = Self> {
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub enum Sign {
     Positive = 0,
-    Negative = 1
+    Negative = 1,
 }
 impl From<bool> for Sign {
     /// Treats `true` as negative and `false` as positive.
