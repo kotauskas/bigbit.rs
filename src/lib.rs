@@ -29,7 +29,7 @@
 //! [BigBitStd]: https://github.com/amitguptagwl/BigBit "BitBit specification on GitHub"
 //! [changelog]: https://github.com/kotauskas/bigbit.rs/releases " "
 
-#![cfg_attr(feature="clippy", allow(clippy::suspicious_op_assign_impl))] // Fuck this lint, seriously. Whoever wrote "None" in known problems is fucking retarded.
+#![cfg_attr(feature="clippy", allow(clippy::suspicious_op_assign_impl))]
 
 #![no_std]
 extern crate alloc;
@@ -87,6 +87,14 @@ pub trait Gcd<Rhs = Self>: Sized {
     ///
     /// [0]: https://en.wikipedia.org/wiki/Euclidean_algorithm "Euclidean Algorithm on Wikipedia"
     fn gcd(lhs: Self, rhs: Rhs) -> Self;
+}
+/// Calculates the greatest common divisor of two numbers.
+///
+/// This is an alias for using the trait directly which allows you to write `bigbit::gcd(<any two BigBit numbers>)` instead of importing the trait into scope and using `A::gcd(b)`, which is less readable and less functional-styled.
+#[inline(always)]
+pub fn gcd<A, B>(lhs: A, rhs: B) -> A
+where A: Gcd<B> {
+    A::gcd(lhs, rhs)
 }
 
 /// The sign of a number.
