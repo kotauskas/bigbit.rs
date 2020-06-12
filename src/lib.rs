@@ -35,16 +35,20 @@
 extern crate alloc;
 
 pub mod headbyte;
-pub use headbyte::{HBNum, HeadByte};
+pub use crate::headbyte::{HBNum, HeadByte};
 // Uncomment these after adding EHB:
 //pub mod extheadbyte;
 //pub use extheadbyte::{EHBNum, ExtHeadByte};
 pub mod linkedbytes;
-pub use linkedbytes::{LBNum, LBNumRef, LBString, LBSequence, LinkedByte};
+pub use linkedbytes::{LBNum, LBString, LinkedByte};
 
-mod traits;
-pub use traits::*;
 pub(crate) mod tables; pub(crate) use tables::*;
+
+/// Basic types which can and should be in scope when using BigBit.
+pub mod prelude {
+    pub use crate::linkedbytes::{LBNum, LBString, LinkedByte};
+    pub use crate::headbyte::{HBNum, HeadByte};
+}
 
 /// Combined division and remainder operations.
 ///
@@ -121,7 +125,7 @@ impl From<Sign> for bool {
     fn from(op: Sign) -> Self {
         match op {
             Sign::Positive => false,
-            Sign::Negative => true
+            Sign::Negative => true,
         }
     }
 }
@@ -129,7 +133,7 @@ impl core::fmt::Display for Sign {
     fn fmt(&self, fmt: &mut core::fmt::Formatter) -> Result<(), core::fmt::Error> {
         fmt.write_str(match self {
             Sign::Positive => "Positive",
-            Sign::Negative => "Negative"
+            Sign::Negative => "Negative",
         })
     }
 }
