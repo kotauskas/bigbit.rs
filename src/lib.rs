@@ -31,7 +31,7 @@
 
 #![cfg_attr(feature="clippy", allow(clippy::suspicious_op_assign_impl))]
 
-#![no_std]
+#![cfg_attr(not(feature = "std"), no_std)]
 extern crate alloc;
 
 pub mod headbyte;
