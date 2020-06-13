@@ -17,7 +17,24 @@ fn lb_add() {
         LBSequence::from(vec![
             LinkedByte::from(0).into_linked(),
             LinkedByte::from(0).into_linked(),
-            LinkedByte::from(1)
+            LinkedByte::from(1),
+    ])).unwrap();
+    assert_eq!(num, expected);
+}
+
+#[test]
+fn lb_sub() {
+    let mut num = LBNum::try_from(
+        LBSequence::from(vec![
+            LinkedByte::from(1).into_linked(),
+            LinkedByte::from(1),
+    ])).unwrap();
+
+    num -= 2_u8;
+
+    let expected = LBNum::try_from(
+        LBSequence::from(vec![
+            LinkedByte::from(127),
     ])).unwrap();
     assert_eq!(num, expected);
 }

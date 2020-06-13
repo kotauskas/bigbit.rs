@@ -1,5 +1,9 @@
 use crate::linkedbytes::{LBNum, LBNumRef, LinkedByte};
-use core::{ops, convert::TryInto};
+use core::{
+    ops,
+    hint,
+    convert::TryInto,
+};
 
 impl LBNum {
     /// Decrements the byte at the specified index and returns the type of result.
@@ -150,20 +154,22 @@ macro_rules! impl_sub_with_primitive {
                     if wrapped {
                         match self.decrement_at_index(1) {
                             DecrementResult::Ok(_) => {},
-                            DecrementResult::EndedWithBorrow | DecrementResult::NoSuchIndex => {return true;}
+                            DecrementResult::EndedWithBorrow | DecrementResult::NoSuchIndex => {return true;},
                         }
                     }
-                    *self.0.get_mut(0).unwrap_or_else(||{core::hint::unreachable_unchecked()}) = val;
+                    *self.0.get_mut(0).unwrap_or_else(|| hint::unreachable_unchecked() ) = val;
                 }
                 let rem: u8 = rem.try_into().unwrap();
                 let (val, wrapped) = self.0.inner_mut()[0].sub_with_borrow(LinkedByte::from(rem));
                 if wrapped {
                     match self.decrement_at_index(1) {
                         DecrementResult::Ok(_) => {},
-                        DecrementResult::EndedWithBorrow | DecrementResult::NoSuchIndex => {return true;}
+                        DecrementResult::EndedWithBorrow | DecrementResult::NoSuchIndex => {return true;},
                     }
                 }
-                *self.0.get_mut(0).unwrap_or_else(||{core::hint::unreachable_unchecked()}) = val;
+                *self.0.get_mut(0)
+                    .unwrap_or_else(|| hint::unreachable_unchecked() ) // Unreachable since we checked for this in the beginning.
+                    = val;
                 self.zero_fold();
                 false
             }

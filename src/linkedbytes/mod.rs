@@ -161,6 +161,10 @@ impl LBNum {
                 self.0.inner_mut().pop();
             }
         }
+        if self.num_bytes() != 0 {
+            let last_element_index = self.num_bytes() - 1;
+            self.0.inner_mut()[last_element_index].make_end();
+        }
     }
 }
 impl core::convert::TryFrom<Vec<LinkedByte>> for LBNum {
