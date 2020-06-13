@@ -1,7 +1,7 @@
 use crate::linkedbytes::{LBNum, LBNumRef};
 use core::cmp::{self, Ordering};
 
-mod add; mod sub; mod mul; mod div; mod from; mod tryinto; mod fmt;
+mod add; mod sub; mod mul; mod div; mod from; mod tryinto; mod fmt; mod gcd;
 pub(crate) use sub::DecrementResult;
 
 impl cmp::PartialEq for LBNum {
