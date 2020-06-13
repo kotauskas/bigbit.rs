@@ -46,12 +46,12 @@ impl HBNum {
     ///
     /// The results of inspecting the head byte are reliable and always match the properties of the actual value of the entire number. For example, if `has_exponent` on the head byte always returns `true`, there always is an exponent byte to retreieve.
     #[inline(always)]
-    pub fn headbyte(&self) -> HeadByte {
+    pub const fn headbyte(&self) -> HeadByte {
         self.hb
     }
     /// Returns the exponent, or `None` if it's not used (mainly the case for integers).
     #[inline(always)]
-    pub fn exponent(&self) -> Option<Exponent> {
+    pub const fn exponent(&self) -> Option<Exponent> {
         self.exponent
     }
 
@@ -264,7 +264,7 @@ impl HeadByte {
 
     /// Consumes the value and returns the inner byte.
     #[inline(always)]
-    pub fn into_inner(self) -> u8 {
+    pub const fn into_inner(self) -> u8 {
         self.0
     }
 }

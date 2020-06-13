@@ -29,7 +29,18 @@
 //! [BigBitStd]: https://github.com/amitguptagwl/BigBit "BitBit specification on GitHub"
 //! [changelog]: https://github.com/kotauskas/bigbit.rs/releases " "
 
-#![cfg_attr(feature="clippy", allow(clippy::suspicious_op_assign_impl))]
+#![cfg_attr(feature = "clippy", warn(clippy::pedantic, clippy::nursery))]
+#![cfg_attr(feature = "clippy", allow( // All of these lints are generally bullshit and should not be a thing or require serious improvement.
+    clippy::suspicious_op_assign_impl,
+    clippy::inline_always,
+    clippy::large_digit_groups,
+    clippy::doc_markdown,
+    clippy::must_use_candidate,
+    clippy::match_bool,
+    clippy::wildcard_imports,
+    clippy::redundant_pub_crate,
+    clippy::if_not_else,
+))]
 
 #![cfg_attr(not(feature = "std"), no_std)]
 extern crate alloc;
@@ -132,8 +143,8 @@ impl From<Sign> for bool {
 impl core::fmt::Display for Sign {
     fn fmt(&self, fmt: &mut core::fmt::Formatter) -> Result<(), core::fmt::Error> {
         fmt.write_str(match self {
-            Sign::Positive => "Positive",
-            Sign::Negative => "Negative",
+            Self::Positive => "Positive",
+            Self::Negative => "Negative",
         })
     }
 }

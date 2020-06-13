@@ -8,10 +8,10 @@ fn lb_add() {
     let mut num = LBNum::try_from(
         LBSequence::from(vec![
             LinkedByte::from(41).into_linked(),
-            LinkedByte::from(127)
+            LinkedByte::from(127),
     ])).unwrap();
 
-    num += 87u8; // haha funny bite number
+    num += 87_u8; // haha funny bite number
 
     let expected = LBNum::try_from(
         LBSequence::from(vec![

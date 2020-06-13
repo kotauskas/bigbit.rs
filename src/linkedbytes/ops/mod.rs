@@ -156,10 +156,10 @@ impl LBNum {
     /// Consumes `self` and returns the logarithm of the given base.
     #[inline]
     #[must_use = "this is an expensive non-in-place operation"]
-    pub fn logb(mut self, base: LBNum) -> Self {
+    pub fn logb(mut self, base: Self) -> Self {
         let mut result = Self::ZERO;
         let divide_by = base.clone();
-        let base_m1 = base - 1u8;
+        let base_m1 = base - 1_u8;
         while self > base_m1 {
             self /= &divide_by;
             result.increment();

@@ -15,9 +15,9 @@ impl LBNum {
         if radix < 2 || radix > 36 { // Make sure that the radix is valid.
             panic!("invalid value for radix (not in range from 2 to 36, inclusively)");
         }
-        if self == 0u8 {return '0'.to_string();} // Avoid an empty string condition.
+        if self == 0_u8 {return '0'.to_string();} // Avoid an empty string condition.
         let mut result = String::new();
-        while self != 0u8 {
+        while self != 0_u8 {
             let remainder = self.div_rem_assign(radix);
             let remainder: usize = (&remainder).try_into().unwrap_or_else(|_| unsafe {hint::unreachable_unchecked()});
             result.push(RADIX_TABLE[remainder]);

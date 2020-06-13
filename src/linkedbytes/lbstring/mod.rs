@@ -53,7 +53,7 @@ impl LBString {
     }
     /// Returns an immutable reference to the underlying sequence.
     #[inline(always)]
-    pub fn inner(&self) -> &LBSequence {
+    pub const fn inner(&self) -> &LBSequence {
         &self.0
     }
 }
@@ -61,7 +61,7 @@ impl core::iter::FromIterator<char> for LBString {
     fn from_iter<I: IntoIterator<Item = char>>(iter: I) -> Self {
         let mut result = Self(LBSequence::empty());
         let mut lbn = LBNum::ZERO;
-        for c in iter.into_iter() {
+        for c in iter {
             lbn.make_zero(); // This is a specialized method for making the value zero without reallocating,
                              // which makes it vital for larger strings.
             lbn += u32::from(c);
@@ -96,7 +96,7 @@ pub struct LBCharsIter<'a> {
     index: usize
 }
 impl<'a> LBCharsIter<'a> {
-    pub fn new(s: &'a LBString) -> Self {
+    pub const fn new(s: &'a LBString) -> Self {
         Self {inner: s, index: 0}
     }
 }

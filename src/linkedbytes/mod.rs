@@ -72,13 +72,12 @@ impl LBNum {
     ///
     /// Use this to locate bytes at arbitrary indicies.
     #[inline(always)]
-    #[must_use]
     pub const fn inner(&self) -> &LBSequence {
         &self.0
     }
     /// Consumes the number and returns its inner sequence.
     #[inline(always)]
-    #[must_use]
+    #[cfg_attr(feature = "clippy", allow(clippy::missing_const_for_fn))] // Destructors cannot be invoked at compile time just yet
     pub fn into_inner(self) -> LBSequence {
         self.0
     }
@@ -193,7 +192,7 @@ impl core::convert::TryFrom<LBSequence> for LBNum {
     /// [0]: struct.InvalidLBSequence.html "InvalidLBSequence — marker error type representing that the decoder has encountered an invalid Linked Bytes sequence"
     #[inline]
     fn try_from(op: LBSequence) -> DecodeResult {
-        if Self::check_slice(&op.inner()) {
+        if Self::check_slice(op.inner()) {
             Ok(Self(op))
         } else {
             Err(InvalidLBSequence)
@@ -236,12 +235,12 @@ impl<'a> LBNumRef<'a> {
 
     /// Returns the number of bytes in the number.
     #[inline(always)]
-    pub fn len(self) -> usize {
+    pub const fn len(self) -> usize {
         self.0.len()
     }
     /// Returns `true` if the number is 0, `false` otherwise.
     #[inline(always)]
-    pub fn is_empty(self) -> bool {
+    pub const fn is_empty(self) -> bool {
         self.0.is_empty()
     }
     /// Returns a by-value iterator over the linked bytes, **in little endian byte order.**
@@ -459,7 +458,6 @@ impl LinkedByte {
     ///
     /// The opposite of `is_end`.
     #[inline(always)]
-    #[must_use]
     pub const fn is_linked(self) -> bool {
         (self.0 & Self::LINK_MASK) != 0
     }
@@ -467,7 +465,6 @@ impl LinkedByte {
     ///
     /// The opposite of `is_linked`.
     #[inline(always)]
-    #[must_use]
     pub const fn is_end(self) -> bool {
         (self.0 & Self::LINK_MASK) == 0
     }
@@ -475,13 +472,12 @@ impl LinkedByte {
     ///
     /// The main use for this is performing arithmetic with linked bytes.
     #[inline(always)]
-    #[must_use]
     pub const fn value(self) -> u8 {
         self.0 & Self::VALUE_MASK
     }
     /// Sets the link bit to `true` (linked state).
     #[inline(always)]
-    #[must_use]
+    #[must_use = "this is not an in-place operation"]
     pub const fn into_linked(self) -> Self {
         Self(self.0 | Self::ZERO_LINK.0)
     }
@@ -492,7 +488,7 @@ impl LinkedByte {
     }
     /// Sets the link bit to `false` (endpoint state).
     #[inline(always)]
-    #[must_use]
+    #[must_use = "this is not an in-place operation"]
     pub const fn into_end(self) -> Self {
         Self(self.0 & Self::VALUE_MASK)
     }
@@ -503,7 +499,7 @@ impl LinkedByte {
     }
     /// Performs checked addition. `None` is returned if the result overflows the limit of 127.
     #[inline]
-    #[must_use]
+    #[must_use = "this is not an in-place operation"]
     pub fn checked_add(self, rhs: Self) -> Option<Self> {
         let (lhs_end, rhs_end) = (self.into_end().0, rhs.into_end().0);
         if let Some(nonwrapping) = lhs_end.checked_add(rhs_end) {
@@ -518,7 +514,7 @@ impl LinkedByte {
     ///
     /// [ca]: #method.checked_add "checked_add — perform checked addition"
     #[inline]
-    #[must_use]
+    #[must_use = "this is not an in-place operation"]
     pub fn add_with_carry(self, rhs: Self) -> (Self, bool) {
         if let Some(nonwrapping) = self.checked_add(rhs) {
             (nonwrapping, false)
@@ -528,7 +524,7 @@ impl LinkedByte {
     }
     /// Performs checked subtraction. `None` is returned if the result underflows the limit of 0.
     #[inline]
-    #[must_use]
+    #[must_use = "this is not an in-place operation"]
     pub fn checked_sub(self, rhs: Self) -> Option<Self> {
         let (lhs_end, rhs_end) = (self.into_end(), rhs.into_end());
         if let Some(nonwrapping) = lhs_end.0.checked_sub(rhs_end.0) {
@@ -540,6 +536,8 @@ impl LinkedByte {
     /// Performs checked wrapping subtraction. Unlike [`checked_sub`][0], this method returns a tuple, in which the first value is the result, which wraps over if the result underflows the limit of 0, and the second value is whether the overflow actually occurred.
     ///
     /// [0]: #method.checked_sub "checked_sub — perform checked subtraction"
+    #[inline]
+    #[must_use = "this is not an in-place operation"]
     pub fn sub_with_borrow(self, rhs: Self) -> (Self, bool) {
         if let Some(nonwrapping) = self.checked_sub(rhs) {
             (nonwrapping, false)
@@ -554,8 +552,7 @@ impl LinkedByte {
     ///
     /// [ii7]: method.into_int7 "into_int7 — consume the value and unwrap it into its inner 7-bit integer"
     #[inline(always)]
-    #[must_use]
-    pub fn into_inner(self) -> u8 {
+    pub const fn into_inner(self) -> u8 {
         self.0
     }
     /// Consumes the value and unwraps it into its inner 7-bit integer, i.e. dropping the link bit if it's set.
@@ -564,8 +561,7 @@ impl LinkedByte {
     ///
     /// [ii]: #method.into_inner "into_inner — consume the value and unwrap it into its inner u8, retaining the link bit if it's set"
     #[inline(always)]
-    #[must_use]
-    pub fn into_int7(self) -> u8 {
+    pub const fn into_int7(self) -> u8 {
         self.into_end().0
     }
 }
@@ -574,7 +570,6 @@ impl From<u8> for LinkedByte {
     ///
     /// The most significant bit is silently dropped. Use `into_linked` to convert the result into a linked byte if you actually want to initialize it like that.
     #[inline(always)]
-    #[must_use]
     fn from(op: u8) -> Self {
         Self(op).into_end()
     }
@@ -584,7 +579,6 @@ impl From<(u8, bool)> for LinkedByte {
     ///
     /// The most significant bit is silently dropped.
     #[inline(always)]
-    #[must_use]
     fn from(op: (u8, bool)) -> Self {
         // This casts the boolean into a 0/1 u8 and shifts it into the link bit position, then constructs a mask which either accepts the link bit or sets it.
         let mask = Self::VALUE_MASK | ((op.1 as u8) << 7);
@@ -595,7 +589,6 @@ impl From<(u8, bool)> for LinkedByte {
 impl From<LinkedByte> for u8 {
     /// Consumes the byte and unwraps it into its inner `u8`, retaining the link bit if it's set.
     #[inline(always)]
-    #[must_use]
     fn from(op: LinkedByte) -> Self {
         op.0
     }

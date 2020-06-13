@@ -1,3 +1,5 @@
+#![cfg_attr(feature = "clippy", allow(clippy::use_self))]
+
 use crate::linkedbytes::{LBNum, LBNumRef, LinkedByte};
 use core::{ops, convert::TryInto};
 
@@ -125,7 +127,7 @@ macro_rules! impl_add_with_primitive {
         impl ops::AddAssign<LBNum> for $ty {
             #[inline]
             fn add_assign(&mut self, rhs: LBNum) {
-                if let Ok(val) = TryInto::<$ty>::try_into(*self + rhs) {
+                if let Ok(val) = TryInto::try_into(*self + rhs) {
                     *self = val;
                 } else {
                     panic!("integer overflow while adding a BigBit number to a primitive integer");

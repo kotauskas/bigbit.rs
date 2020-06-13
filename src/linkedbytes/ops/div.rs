@@ -1,3 +1,5 @@
+#![cfg_attr(feature = "clippy", allow(clippy::use_self))]
+
 use crate::{
     linkedbytes::{LBNum, LBNumRef},
     DivRem, DivRemAssign,
@@ -38,7 +40,7 @@ impl DivRemAssign<&Self> for LBNum {
     /// Dividing by 0 triggers an immediate panic.
     #[inline]
     fn div_rem_assign(&mut self, rhs: &Self) -> Self {
-        assert!(rhs > &0u8);
+        assert!(rhs > &0_u8);
         let mut quotient = Self::ZERO;
         loop {
             if (self as &Self) < rhs {break;}
@@ -70,7 +72,7 @@ impl DivRemAssign<LBNumRef<'_>> for LBNum {
     /// # Panics
     /// Dividing by 0 triggers an immediate panic.
     fn div_rem_assign(&mut self, rhs: LBNumRef<'_>) -> Self {
-        assert!(rhs > 0u8);
+        assert!(rhs > 0_u8);
         let mut quotient = Self::ZERO;
         loop {
             if *self < rhs {break;}
