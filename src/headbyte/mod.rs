@@ -271,7 +271,6 @@ impl HeadByte {
 impl From<u8> for HeadByte {
     /// Wraps a byte into a Head Byte.
     #[inline(always)]
-    #[must_use]
     fn from(op: u8) -> Self {
         Self(op)
     }
@@ -279,15 +278,13 @@ impl From<u8> for HeadByte {
 impl From<HeadByte> for u8 {
     /// Consumes the Head Byte and returns the underlying inner byte.
     #[inline(always)]
-    #[must_use]
     fn from(op: HeadByte) -> Self {
         op.0
     }
 }
 impl core::ops::Neg for HeadByte {
     type Output = Self;
-    #[inline(always)]
-    #[must_use]
+    #[inline]
     fn neg(self) -> Self::Output {
         if self.is_nan() || self == Self::ZERO {
             self
@@ -430,7 +427,6 @@ impl core::convert::TryFrom<u8> for Exponent {
 impl From<Exponent> for u8 {
     /// Consumes the exponent and returns the underlying inner byte.
     #[inline(always)]
-    #[must_use]
     fn from(op: Exponent) -> Self {
         op.0
     }

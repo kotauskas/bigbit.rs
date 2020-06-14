@@ -33,7 +33,6 @@ impl LBNum {
     pub const ZERO: Self = Self(LBSequence::empty());
     /// The amount of bytes used in the number.
     #[inline(always)]
-    #[must_use]
     pub fn num_bytes(&self) -> usize {
         self.0.inner().len()
     }
@@ -308,20 +307,17 @@ pub struct LBSequence(pub(crate) Vec<LinkedByte>);
 impl LBSequence {
     /// Creates an empty `LBSequence`.
     #[inline(always)]
-    #[must_use]
     pub const fn empty() -> Self {
         Self(Vec::new())
     }
 
     /// Immutably borrows the inner container.
     #[inline(always)]
-    #[must_use]
     pub const fn inner(&self) -> &Vec<LinkedByte> {
         &self.0
     }
     /// Mutably borrows the inner container.
     #[inline(always)]
-    #[must_use]
     pub fn inner_mut(&mut self) -> &mut Vec<LinkedByte> {
         &mut self.0
     }
@@ -345,13 +341,11 @@ impl LBSequence {
     }
     /// Returns the number of bytes in the sequence.
     #[inline(always)]
-    #[must_use]
     pub fn len(&self) -> usize {
         self.0.len()
     }
     /// Returns `true` if the sequence is empty (= 0) or `false` otherwise.
     #[inline(always)]
-    #[must_use]
     pub fn is_empty(&self) -> bool {
         self.0.is_empty()
     }
@@ -379,7 +373,6 @@ impl LBSequence {
 }
 impl From<Vec<LinkedByte>> for LBSequence {
     #[inline(always)]
-    #[must_use]
     fn from(op: Vec<LinkedByte>) -> Self {
         Self(op)
     }
@@ -387,7 +380,6 @@ impl From<Vec<LinkedByte>> for LBSequence {
 impl From<&[LinkedByte]> for LBSequence {
     /// Clones the contens of the slice into a Linked Bytes sequence.
     #[inline(always)]
-    #[must_use]
     fn from(op: &[LinkedByte]) -> Self {
         Self(Vec::from(op))
     }
@@ -419,7 +411,6 @@ impl BorrowMut<[LinkedByte]> for LBSequence {
 impl FromIterator<LinkedByte> for LBSequence {
     /// Converts an iterator over linked bytes into an `LBSequence`. **Little-endian byte order is assumed, regardless of platform.**
     #[inline(always)]
-    #[must_use]
     fn from_iter<T: IntoIterator<Item = LinkedByte>>(op: T) -> Self {
         Self(op.into_iter().collect::<Vec<LinkedByte>>())
     }

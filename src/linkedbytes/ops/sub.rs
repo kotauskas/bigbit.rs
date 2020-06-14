@@ -64,7 +64,6 @@ impl LBNum {
 }
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
-#[must_use]
 pub(crate) enum DecrementResult {
     /// The decrement-at-index operation was successful. The boolean parameter then describes whether wrapping occurred or not.
     Ok(bool),

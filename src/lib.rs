@@ -135,7 +135,6 @@ pub enum Sign {
 impl From<bool> for Sign {
     /// Treats `true` as negative and `false` as positive.
     #[inline]
-    #[must_use]
     fn from(op: bool) -> Self {
         if op {Self::Negative} else {Self::Positive}
     }
@@ -143,7 +142,6 @@ impl From<bool> for Sign {
 impl From<Sign> for bool {
     /// Treats `true` as negative and `false` as positive.
     #[inline(always)]
-    #[must_use]
     fn from(op: Sign) -> Self {
         match op {
             Sign::Positive => false,
