@@ -23,11 +23,19 @@
 //! - `Debug` and `Display` formatting for \[E\]HB (i.e. converting the numbers either into a debugging-friendly representation as an array of bytes or a string representing the number in decimal scientific notation or full notation, as well as other numeric notations; simple `Debug` and `Display` decimal formatting will be added in 0.1.0 while the rest is planned for 1.0.0)
 //! - **Tests** (planned for 0.1.0 but might be partially added earlier)
 //!
+//! # Feature flags
+//! Several [Cargo feature flags][CargoFeatures] are available:
+//! - **`std`** *(enabled by default)* — disables `no_std`, allowing for `std`-dependent trait implementations. **Disable this feature if using `no_std`.**
+//! - **`num_traits`** *(enabled by default)* — enables trait implementations for traits from [`num-traits`], disable to insignificantly decrease compile time and code size. **The current version of `num-traits` is `0.2.x` — please open an issue if a new one comes out.**
+//! - **`clippy`** *(enabled by default)* — disable to remove all mentions of Clippy lints to avoid unknown lint errors if working on this crate without Clippy installed.
+//!
 //! # Changelog
 //! The full version history can be found [here][changelog].
 //!
 //! [BigBitStd]: https://github.com/amitguptagwl/BigBit "BitBit specification on GitHub"
 //! [changelog]: https://github.com/kotauskas/bigbit.rs/releases " "
+//! [CargoFeatures]: https://doc.rust-lang.org/cargo/reference/features.html "Documentation for crate features on the Cargo Reference"
+//! [`num-traits`]: https://crates.io/crates/num-traits "num-traits on Crates.io"
 
 #![cfg_attr(feature = "clippy", warn(clippy::pedantic, clippy::nursery))]
 #![cfg_attr(feature = "clippy", allow( // All of these lints are generally bullshit and should not be a thing or require serious improvement.
@@ -52,6 +60,9 @@ pub use crate::headbyte::{HBNum, HeadByte};
 //pub use extheadbyte::{EHBNum, ExtHeadByte};
 pub mod linkedbytes;
 pub use linkedbytes::{LBNum, LBString, LinkedByte};
+
+#[cfg(feature = "num_traits")]
+pub extern crate num_traits;
 
 pub(crate) mod tables; pub(crate) use tables::*;
 
