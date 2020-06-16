@@ -39,6 +39,7 @@
 
 #![cfg_attr(feature = "clippy", warn(clippy::pedantic, clippy::nursery))]
 #![cfg_attr(feature = "clippy", allow( // All of these lints are generally bullshit and should not be a thing or require serious improvement.
+    clippy::suspicious_arithmetic_impl,
     clippy::suspicious_op_assign_impl,
     clippy::inline_always,
     clippy::large_digit_groups,
@@ -48,6 +49,7 @@
     clippy::wildcard_imports,
     clippy::redundant_pub_crate,
     clippy::if_not_else,
+    clippy::cast_lossless, // What does this even mean?
 ))]
 
 #![cfg_attr(not(feature = "std"), no_std)]
