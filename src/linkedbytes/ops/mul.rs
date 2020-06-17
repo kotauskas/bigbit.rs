@@ -1,18 +1,29 @@
 #![cfg_attr(feature = "clippy", allow(clippy::use_self))] // Multiplication impl blocks do this intentionally.
 
-use crate::LBNum;
+use crate::linkedbytes::{
+    LBNum, LBNumRef,
+};
 use core::{
     ops,
     mem::swap,
 };
 
-// Reference by reference
-impl ops::Mul<&LBNum> for &LBNum {
-    type Output = LBNum;
+// Implementation checklist:
+// | lhs | rhs | LBNumRef | reference | value | coreint |
+// | LBNumRef  | primary  | yes       | yes   | yes     |
+// | reference | yes      | yes       | yes   | yes     |
+// | value     | yes      | yes       | yes   | yes     |
+// | coreint   | yes      | yes       | yes   | N/A     |
+// | value *=  | yes      | yes       | yes   | yes     |
+// MulAssign's lhs is always value.
+// Should be grouped in blocks of 3 by left operand.
 
-    /// Multiplies `self` by another `LBNum`. **This will consume neither of the operands.**
+// LBNumRef by LBNumRef
+impl<'l, 'r> ops::Mul<LBNumRef<'r>> for LBNumRef<'l> {
+    type Output = LBNum;
+    /// Multiplies an `LBNumRef` **by another `LBNumRef`**.
     #[inline]
-    fn mul(self, rhs: &LBNum) -> LBNum {
+    fn mul(self, rhs: LBNumRef<'r>) -> LBNum {
         let mut result = LBNum::ZERO;
         let (mut left, mut right) = (self, rhs);
         if right.0.len() > left.0.len() {
@@ -29,60 +40,112 @@ impl ops::Mul<&LBNum> for &LBNum {
         result
     }
 }
-// Value by reference
-impl ops::Mul<&LBNum> for LBNum {
+// LBNumRef by reference
+impl<'l, 'r> ops::Mul<&'r LBNum> for LBNumRef<'l> {
     type Output = LBNum;
-
-    /// Multiplies `self` by another `LBNum`. **This will consume the lefthand operand, but not the righthand one. Borrow the lefthand operand to avoid such behavior.**
+    // Multiplies an `LBNumRef` **by a reference to `LBNum`**.
     #[inline(always)]
-    fn mul(self, rhs: &LBNum) -> LBNum {
-        ops::Mul::mul(&self, rhs)
+    fn mul(self, rhs: &'r LBNum) -> LBNum {
+        ops::Mul::mul(self, rhs.borrow())
+    }
+}
+// LBNumRef by value
+impl<'l> ops::Mul<LBNum> for LBNumRef<'l> {
+    type Output = LBNum;
+    // Multiplies an `LBNumRef` **by an `LBNum`, consuming it.** Borrow the righthand operand (via normal borrow or `.borrow()`) to avoid such behavior.
+    #[inline(always)]
+    fn mul(self, rhs: LBNum) -> LBNum {
+        ops::Mul::mul(self, rhs.borrow())
+    }
+}
+
+// Reference by LBNumRef
+impl<'l, 'r> ops::Mul<LBNumRef<'r>> for &LBNum {
+    type Output = LBNum;
+    // Multiplies an `LBNum` *reference* **by an `LBNumRef`**.
+    #[inline(always)]
+    fn mul(self, rhs: LBNumRef<'r>) -> LBNum {
+        ops::Mul::mul(self.borrow(), rhs)
+    }
+}
+// Reference by reference
+impl<'l, 'r> ops::Mul<&'r LBNum> for &'l LBNum {
+    type Output = LBNum;
+    // Multiplies an `LBNum` *reference* **by another `LBNum` reference.**
+    #[inline(always)]
+    fn mul(self, rhs: &'r LBNum) -> LBNum {
+        ops::Mul::mul(self.borrow(), rhs.borrow())
     }
 }
 // Reference by value
-impl ops::Mul<LBNum> for &LBNum {
+impl<'l> ops::Mul<LBNum> for &'l LBNum {
     type Output = LBNum;
-
-    /// Multiplies `self` by another `LBNum`. **This will consume the righthand operand, but not the lefthand one. Borrow the righthand operand to avoid such behavior.**
+    /// Multiplies an `LBNum` *reference* **by an `LBNum`, consuming it.** Borrow the righthand operand (via normal borrow or `.borrow()`) to avoid such behavior.
     #[inline(always)]
     fn mul(self, rhs: LBNum) -> LBNum {
-        ops::Mul::mul(self, &rhs)
+        ops::Mul::mul(self.borrow(), rhs.borrow())
+    }
+}
+
+// Value by LBNumRef
+impl<'r> ops::Mul<LBNumRef<'r>> for LBNum {
+    type Output = LBNum;
+    // Multiplies an `LBNum` **by an `LBNumRef`,** consuming the **lefthand** operand. Borrow it (via normal borrow or `.borrow()`) to avoid such behavior.
+    #[inline(always)]
+    fn mul(self, rhs: LBNumRef<'r>) -> LBNum {
+        ops::Mul::mul(self.borrow(), rhs)
+    }
+}
+// Value by reference
+impl<'r> ops::Mul<&'r LBNum> for LBNum {
+    type Output = LBNum;
+    /// Multiplies an `LBNum` **by an `LBNum` reference.**, consuming the **lefthand** operand. Borrow it (via normal borrow or `.borrow()`) to avoid such behavior.
+    #[inline(always)]
+    fn mul(self, rhs: &'r LBNum) -> LBNum {
+        ops::Mul::mul(self.borrow(), rhs.borrow())
     }
 }
 // Value by value
 impl ops::Mul<LBNum> for LBNum {
     type Output = LBNum;
-
-    /// Multiplies `self` by another `LBNum`. **This will consume both operands, borrow them to avoid such behavior.**
+    /// Multiplies an `LBNum` **by another `LBNum`, consuming both operands.** Borrow them (via normal borrow or `.borrow()`) to avoid such behavior.
     #[inline(always)]
     fn mul(self, rhs: Self) -> Self {
-        ops::Mul::mul(&self, &rhs)
+        ops::Mul::mul(self.borrow(), rhs.borrow())
     }
 }
 
+// By LBNumRef
+impl<'r> ops::MulAssign<LBNumRef<'r>> for LBNum {
+    // Multiplies **by an `LBNumRef`** in place.
+    #[inline(always)]
+    fn mul_assign(&mut self, rhs: LBNumRef<'r>) {
+        *self = ops::Mul::mul(self.borrow(), rhs)
+    }
+}
 // By reference
 impl ops::MulAssign<&LBNum> for LBNum {
-    /// Multiplies `self` by another `LBNum` in place. **This will not consume the righthand operand.**
+    /// Multiplies **by an `LBNum` reference** in place.
     #[inline(always)]
     fn mul_assign(&mut self, rhs: &LBNum) {
-        *self = ops::Mul::mul(self as &LBNum, rhs);
+        *self = ops::Mul::mul(self.borrow(), rhs.borrow());
     }
 }
 // By value
 impl ops::MulAssign<LBNum> for LBNum {
-    /// Multiplies `self` by another `LBNum` in place. **This will consume the righthand operand, borrow it to avoid such behavior.**
+    /// Multiplies **by another `LBNum`** in place, **consuming it.** Borrow the righthand operand (via normal borrow or `.borrow()`) to avoid such behavior.
     #[inline(always)]
     fn mul_assign(&mut self, rhs: LBNum) {
-        *self = ops::Mul::mul(self as &LBNum, &rhs);
+        *self = ops::Mul::mul(self.borrow(), rhs.borrow());
     }
 }
 
 macro_rules! impl_mul_by_primitive {
     ($ty:ident) => {
-        // Reference by value
-        impl ops::Mul<$ty> for &LBNum {
+        // LBNumRef by int
+        impl<'l> ops::Mul<$ty> for LBNumRef<'l> {
             type Output = LBNum;
-
+            #[doc = "Multiplies an `LBNumRef` **by a scalar integer.**"]
             #[inline]
             fn mul(self, rhs: $ty) -> LBNum {
                 let mut result = LBNum::ZERO;
@@ -94,18 +157,57 @@ macro_rules! impl_mul_by_primitive {
                 result
             }
         }
-        // Value by value
-        impl ops::Mul<$ty> for LBNum {
+        // Reference by int
+        impl<'l> ops::Mul<$ty> for &'l LBNum {
             type Output = LBNum;
-
+            #[doc = "Multiplies an `LBNum` *reference* **by a scalar integer.**"]
             #[inline(always)]
             fn mul(self, rhs: $ty) -> LBNum {
-                ops::Mul::mul(&self, rhs)
+                ops::Mul::mul(self.borrow(), rhs)
             }
         }
-        // By value
+        // Value by int
+        impl ops::Mul<$ty> for LBNum {
+            type Output = LBNum;
+            #[doc = "Multiplies an `LBNum` **by a scalar integer,** consuming the **lefthand** operand. Borrow it (via normal borrow or `.borrow()`) to avoid such behavior"]
+            #[inline(always)]
+            fn mul(self, rhs: $ty) -> LBNum {
+                ops::Mul::mul(self.borrow(), rhs)
+            }
+        }
+
+        // Int by LBNumRef
+        impl<'r> ops::Mul<LBNumRef<'r>> for $ty {
+            type Output = LBNum;
+            #[doc = "Multiplies a scalar integer **by an `LBNumRef`.**"]
+            #[inline(always)]
+            fn mul(self, rhs: LBNumRef<'r>) -> LBNum {
+                ops::Mul::mul(rhs, self)
+            }
+        }
+        // Int by reference
+        impl<'r> ops::Mul<&'r LBNum> for $ty {
+            type Output = LBNum;
+            #[doc = "Multiplies a scalar integer **by an `LBNum` reference.**"]
+            #[inline(always)]
+            fn mul(self, rhs: &'r LBNum) -> LBNum {
+                ops::Mul::mul(rhs.borrow(), self)
+            }
+        }
+        // Int by value
+        impl ops::Mul<LBNum> for $ty {
+            type Output = LBNum;
+            #[doc = "Multiplies a scalar integer **by an `LBNum`, consuming it.** Borrow the righthand operand (via normal borrow or `.borrow()`) to avoid such behavior."]
+            #[inline(always)]
+            fn mul(self, rhs: LBNum) -> LBNum {
+                ops::Mul::mul(rhs.borrow(), self)
+            }
+        }
+
+        // By int
         impl ops::MulAssign<$ty> for LBNum {
             #[inline(always)]
+            #[doc = "Multiplies an `LBNum` **by a scalar integer** in place."]
             fn mul_assign(&mut self, rhs: $ty) {
                 *self = ops::Mul::mul(self as &LBNum, rhs)
             }
