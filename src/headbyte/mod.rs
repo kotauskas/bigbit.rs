@@ -19,27 +19,27 @@ use alloc::vec::Vec;
 pub struct HBNum {
     hb: HeadByte,
     exponent: Option<Exponent>,
-    coefficients: Vec<u8>
+    bytes: Vec<u8>
 }
 impl HBNum {
     /// Constructs a new `HBNum` from the head byte, exponent and the coefficients.
     ///
     /// The length of the coefficient storage and the presence of the exponent override the value in the head byte. **If the head byte cannot fit the total number of bytes, this call panics**.
     #[inline]
-    pub fn from_raw_parts(mut hb: HeadByte, exponent: Option<Exponent>, coefficients: Vec<u8>) -> Self {
-        let num_coefficients: u8 = coefficients.len()
+    pub fn from_raw_parts(mut hb: HeadByte, exponent: Option<Exponent>, coefficient_bytes: Vec<u8>) -> Self {
+        let num_bytes: u8 = coefficient_bytes.len()
             .try_into()
             .expect("the number of coefficients is larger than 63")
         ;
         let num_bytes = match exponent.is_some() {
-            true  => num_coefficients.checked_add(1)
+            true  => num_bytes.checked_add(1)
                         .expect("the number of bytes following the Head Byte is larger than 63"),
-            false => num_coefficients,
+            false => num_bytes,
         };
         hb.set_num_bytes(num_bytes);
         hb.set_exponent_bit(exponent.is_some());
 
-        Self {hb, exponent, coefficients}
+        Self {hb, exponent, bytes: coefficient_bytes}
     }
 
     /// Returns the head byte.
@@ -324,11 +324,11 @@ impl core::fmt::Debug for HeadByte {
 ///
 /// To retreive the real value of an \[E\]HB number, its stored value is multiplied by 10 raised to the power of this value as retreived using [`into_inner`][ii].
 ///
-/// [ii]: #method.into_inner "into_inner — consumes the value and returns the inner byte"
-///
 /// This is **not** a 2's complement signed number: it ranges from -127 to +127, having one bit as the sign and the rest as a normal 7-bit unsigned integer. As a consequence, it's possible to store `0b1_0000000` as the exponent, meaning a resulting exponent of 10⁻⁰, which is undefined. In most cases, this transformation is unwanted (that is, accidential, most likely happening because of a serious mistake during bitwise operations), and as such is not allowed, producing a `TryFrom` error.
 ///
 /// In other words, **protection against `-0` is a safety guarantee**, and actually creating an exponent with this value **requires unsafe code**.
+///
+/// [ii]: #method.into_inner "into_inner — consumes the value and returns the inner byte"
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 #[repr(transparent)]
 pub struct Exponent(u8);
@@ -375,7 +375,9 @@ impl Exponent {
         let sign = !(self.0 & Self::SIGN_MASK);
         Self((self.0 & Self::ABS_MASK) | sign)
     }
-
+    /// Multiplies the exponent with another exponent, returning `None` if the value overflowed.
+    ///
+    /// Note how this performs multiplication in the mathematical sense, but **the actual operation is implemented by addition and thus is extremely performant**. The struct-level documentation for `Exponent` explains why.
     #[inline(always)]
     #[must_use = "this is not an in-place operation"]
     pub fn checked_mul(self, rhs: Self) -> Option<Self> {
@@ -384,11 +386,13 @@ impl Exponent {
             if let Some(result) = self.abs().0.checked_add(rhs.abs().0) {
                 Some(Self(sign | result))
             } else {None}
-
         } else {
             self.checked_div(rhs)
         }
     }
+    /// Divides the exponent by another exponent, returning `None` if the value underflowed.
+    ///
+    /// Note how this performs division in the mathematical sense, but **the actual operation is implemented by subtraction and thus is extremely performant**. The struct-level documentation for `Exponent` explains why.
     #[inline(always)]
     #[must_use = "this is not an in-place operation"]
     fn checked_div(self, rhs: Self) -> Option<Self> {
