@@ -42,3 +42,38 @@ pub trait Gcd<Rhs = Self>: Sized {
     fn gcd(lhs: Self, rhs: Rhs) -> Self;
 }
 
+/// Performs the `+` operation at the specified coefficient byte of a BigBit number. This is used by the multiplication implementations as a simple and fast way of multiplying something by a power of 128 or 256 (former in the case of Linked Bytes, latter for Head Byte and Extended Byte) and then adding the result to another number.
+///
+/// The similar concept from the scalar binary integer world is **bit shifting**, performed by the `<<`/`<<=` and `>>`/`>>=` operators. The difference is that the shift here happens on the fly by tweaking indicies, rather than by shifting the entire number and then adding it to another number.
+///
+/// This operation is not and should not be defined on floating-point numbers, since those have a coefficient which does not meaningfully interact with this concept.
+///
+/// For an in-place version, see [`AddAssignAt`].
+///
+/// ## This is not a general-purpose trait!
+/// **Implementing this trait for types outside of the `bigbit` crate is greatly discouraged for semantic purposes.** Use non-trait methods or third-party traits instead.
+///
+/// [`AddAssignAt`]: trait.AddAssignAt.html "AddAssignAt — performs the += operation at the specified coefficient byte of a BigBit number"
+pub trait AddAt<Rhs = Self> {
+    /// The return type for the operation.
+    type Output;
+    /// Performs the shifting addition.
+    #[must_use = "this is an expensive non-in-place operation"]
+    fn add_at(self, index: usize, rhs: Rhs) -> Self::Output;
+}
+/// Performs the `+=` operation at the specified coefficient byte of a BigBit number. This is used by the multiplication implementations as a simple and fast way of multiplying something by a power of 128 or 256 (former in the case of Linked Bytes, latter for Head Byte and Extended Head Byte) and than adding the result to another number.
+///
+/// The similar concept from the scalar binary integer world is **bit shifting**, performed by the `<<`/`<<=` and `>>`/`>>=` operators. The difference is that the shift here happens on the fly by tweaking indicies, rather than by shifting the entire number and then adding it to another number.
+///
+/// This operation is not and should not be defined on floating-point numbers, since those have a coefficient which does not meaningfully interact with this concept.
+///
+/// For a version which returns the result instead of performing the operation in-place, see [`AddAt`].
+///
+/// # This is not a general-purpose trait!
+/// **Implementing this trait for types outside of the `bigbit` crate is greatly discouraged for semantic purposes.** Use non-trait methods or third-party traits instead.
+///
+/// [`AddAt`]: trait.AddAt.html "AddAt — performs the + operation at the specified coefficient byte of a BigBit number"
+pub trait AddAssignAt<Rhs = Self> {
+    /// Performs the shifting addition in-place.
+    fn add_assign_at(&mut self, index: usize, rhs: Rhs);
+}
