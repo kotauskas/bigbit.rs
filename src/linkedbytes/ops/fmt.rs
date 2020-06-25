@@ -1,6 +1,14 @@
-use crate::{LBNum, RADIX_TABLE, DivRemAssign};
-use core::{fmt::{self, Formatter}, hint, convert::TryInto};
-use alloc::string::{String, ToString};
+use crate::{
+    LBNum, RADIX_TABLE, DivRemAssign,
+};
+use core::{
+    fmt::{self, Formatter},
+    hint,
+    convert::TryInto,
+};
+use alloc::string::{
+    String, ToString,
+};
 
 impl LBNum {
     /// Converts a Linked Bytes number into a string with an arbitrary radix (base), from 2 to 36 inclusively.

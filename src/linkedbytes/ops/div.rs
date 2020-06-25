@@ -4,7 +4,10 @@ use crate::{
     linkedbytes::{LBNum, LBNumRef},
     DivRem, DivRemAssign,
 };
-use core::ops;
+use core::{
+    ops::{Div, DivAssign, Rem, RemAssign},
+    mem,
+};
 
 impl DivRem<&Self> for LBNum {
     type Quotient = Self; type Remainder = Self;
@@ -84,7 +87,7 @@ impl DivRemAssign<LBNumRef<'_>> for LBNum {
                                            // all you need to do to understand this just fine.
     }
 }
-impl ops::Div<&Self> for LBNum {
+impl Div<&Self> for LBNum {
     type Output = Self;
 
     /// Performs integer division.
@@ -96,7 +99,7 @@ impl ops::Div<&Self> for LBNum {
         self.div_rem(rhs).0
     }
 }
-impl ops::Div<Self> for LBNum {
+impl Div<Self> for LBNum {
     type Output = Self;
 
     /// Performs integer division.
@@ -108,7 +111,7 @@ impl ops::Div<Self> for LBNum {
         self / &rhs
     }
 }
-impl ops::DivAssign<&Self> for LBNum {
+impl DivAssign<&Self> for LBNum {
     /// Performs integer division in place.
     ///
     /// # Panics
@@ -118,7 +121,7 @@ impl ops::DivAssign<&Self> for LBNum {
         self.div_rem_assign(rhs);
     }
 }
-impl ops::DivAssign<Self> for LBNum {
+impl DivAssign<Self> for LBNum {
     /// Performs integer division in place.
     ///
     /// # Panics
@@ -128,7 +131,7 @@ impl ops::DivAssign<Self> for LBNum {
         *self /= &rhs;
     }
 }
-impl ops::Rem<&Self> for LBNum {
+impl Rem<&Self> for LBNum {
     type Output = Self;
 
     /// Performs integer modulo.
@@ -140,7 +143,7 @@ impl ops::Rem<&Self> for LBNum {
         self.div_rem(rhs).1
     }
 }
-impl ops::Rem<Self> for LBNum {
+impl Rem<Self> for LBNum {
     type Output = Self;
     /// Performs integer modulo.
     ///
@@ -151,7 +154,7 @@ impl ops::Rem<Self> for LBNum {
         self % &rhs
     }
 }
-impl ops::RemAssign<&Self> for LBNum {
+impl RemAssign<&Self> for LBNum {
     /// Performs integer modulo in place.
     ///
     /// # Panics
@@ -162,7 +165,7 @@ impl ops::RemAssign<&Self> for LBNum {
         *self = remainder;
     }
 }
-impl ops::RemAssign<Self> for LBNum {
+impl RemAssign<Self> for LBNum {
     /// Performs integer modulo in place.
     ///
     /// # Panics
@@ -174,7 +177,7 @@ impl ops::RemAssign<Self> for LBNum {
 }
 
 macro_rules! impl_div_by_primitive {
-    ($ty:ident) => {
+    ($($ty:ident)+) => ($(
         impl DivRem<$ty> for LBNum {
             type Quotient = Self;
             /// The remainder type.
@@ -203,12 +206,12 @@ macro_rules! impl_div_by_primitive {
                     unsafe {self.checked_sub_assign(LBNum::from(rhs).borrow());}
                     quotient.increment();
                 }
-                core::mem::replace(self, quotient)
+                mem::replace(self, quotient)
             }
         }
 
 
-        impl ops::Div<$ty> for LBNum {
+        impl Div<$ty> for LBNum {
             type Output = Self;
 
             #[inline(always)]
@@ -217,7 +220,7 @@ macro_rules! impl_div_by_primitive {
                 self
             }
         }
-        impl ops::DivAssign<$ty> for LBNum {
+        impl DivAssign<$ty> for LBNum {
             #[inline]
             fn div_assign(&mut self, rhs: $ty) {
                 assert!(rhs > 0);
@@ -231,7 +234,7 @@ macro_rules! impl_div_by_primitive {
             }
         }
 
-        impl ops::Rem<$ty> for LBNum {
+        impl Rem<$ty> for LBNum {
             /// The remainder type.
             ///
             /// The reason why this is `Self` instead of the type of the divisor is that the remainder as available when the division is finished is still of type `LBNum`: it's never converted to the divisor type. As a result, the remainder is returned as-is to avoid situations when the remainder is required to be an `LBNum` yet has been converted to the divisor type, which would require converting it back into `LBNum`, which would require another allocation *and* performing the conversion process itself and would also waste the previous buffer.
@@ -241,19 +244,16 @@ macro_rules! impl_div_by_primitive {
                 self.div_rem(rhs).1
             }
         }
-        impl ops::RemAssign<$ty> for LBNum {
+        impl RemAssign<$ty> for LBNum {
             #[inline(always)]
             fn rem_assign(&mut self, rhs: $ty) {
                 let remainder = self.div_rem_assign(rhs);
                 *self = remainder
             }
         }
-    };
+    )+)
 }
 
-impl_div_by_primitive!(u8   );
-impl_div_by_primitive!(u16  );
-impl_div_by_primitive!(u32  );
-impl_div_by_primitive!(u64  );
-impl_div_by_primitive!(u128 );
-impl_div_by_primitive!(usize);
+impl_div_by_primitive! {
+    u8 u16 u32 u64 u128 usize
+}

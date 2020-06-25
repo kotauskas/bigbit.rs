@@ -1,6 +1,6 @@
 use crate::linkedbytes::{LBNum, LBNumRef, LinkedByte};
 use core::{
-    ops,
+    ops::{Sub, SubAssign},
     hint,
     convert::TryInto,
 };
@@ -75,7 +75,7 @@ pub(crate) enum DecrementResult {
     EndedWithBorrow
 }
 
-impl ops::Sub<&Self> for LBNum {
+impl Sub<&Self> for LBNum {
     type Output = Self;
 
     /// Subtracts an `LBNum` from `self`.
@@ -88,7 +88,7 @@ impl ops::Sub<&Self> for LBNum {
         self
     }
 }
-impl ops::Sub<Self> for LBNum {
+impl Sub<Self> for LBNum {
     type Output = Self;
 
     /// Subtracts an `LBNum` from `self`.
@@ -100,7 +100,7 @@ impl ops::Sub<Self> for LBNum {
         self - &rhs
     }
 }
-impl ops::SubAssign<&Self> for LBNum {
+impl SubAssign<&Self> for LBNum {
     /// Subtracts an `LBNum` from `self` in place.
     ///
     /// # Panics
@@ -114,7 +114,7 @@ impl ops::SubAssign<&Self> for LBNum {
         }
     }
 }
-impl ops::SubAssign<Self> for LBNum {
+impl SubAssign<Self> for LBNum {
     /// Subtracts an `LBNum` from `self` in place.
     ///
     /// # Panics
@@ -137,7 +137,7 @@ pub(crate) trait CheckedSubAssign<'a, Rhs = &'a Self> {
 }
 
 macro_rules! impl_sub_with_primitive {
-    ($ty:ident) => {
+    ($($ty:ident)+) => ($(
         impl CheckedSub<'_, $ty> for LBNum {}
         impl CheckedSubAssign<'_, $ty> for LBNum {
             /// Performs checked subtraction, returning `true` if overflow occurred.
@@ -174,7 +174,7 @@ macro_rules! impl_sub_with_primitive {
             }
         }
 
-        impl core::ops::Sub<$ty> for LBNum {
+        impl Sub<$ty> for LBNum {
             type Output = Self;
             /// Subtracts `rhs` from `self`.
             ///
@@ -190,19 +190,16 @@ macro_rules! impl_sub_with_primitive {
         ///
         /// # Panics
         /// Subtraction underflow is undefined for the Linked Bytes format, since it only specifies unsigned integers.
-        impl core::ops::SubAssign<$ty> for LBNum {
+        impl SubAssign<$ty> for LBNum {
             fn sub_assign(&mut self, rhs: $ty) {
                 if unsafe {CheckedSubAssign::checked_sub_assign(self, rhs)} {
                     panic!("BigBit integer underflow");
                 }
             }
         }
-    };
+    )+)
 }
 
-impl_sub_with_primitive!(u8   );
-impl_sub_with_primitive!(u16  );
-impl_sub_with_primitive!(u32  );
-impl_sub_with_primitive!(u64  );
-impl_sub_with_primitive!(u128 );
-impl_sub_with_primitive!(usize);
+impl_sub_with_primitive! {
+    u8 u16 u32 u64 u128 usize
+}

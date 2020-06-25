@@ -1,42 +1,44 @@
 use crate::linkedbytes::{LBNum, LBNumRef};
-use core::cmp::{self, Ordering};
+use core::cmp::{
+    self, PartialOrd, Ord, Ordering,
+};
 
 mod add; mod sub; mod mul; mod div; mod from; mod tryinto; mod fmt; mod gcd;
 pub(crate) use sub::DecrementResult;
 
-impl cmp::PartialEq for LBNum {
+impl PartialEq for LBNum {
     #[inline(always)]
     fn eq(&self, rhs: &Self) -> bool {
         self.cmp(rhs) == Ordering::Equal
     }
 }
-impl cmp::Eq for LBNum {}
-impl cmp::PartialOrd for LBNum {
+impl Eq for LBNum {}
+impl PartialOrd for LBNum {
     #[inline(always)]
     fn partial_cmp(&self, rhs: &Self) -> Option<Ordering> {
         Some(self.cmp(rhs))
     }
 }
-impl cmp::Ord for LBNum {
+impl Ord for LBNum {
     #[inline(always)]
     fn cmp(&self, rhs: &Self) -> Ordering {
         LBNumRef::from(self).cmp(&LBNumRef::from(rhs))
     }
 }
-impl PartialEq for LBNumRef<'_> {
+impl<'l, 'r> PartialEq<LBNumRef<'r>> for LBNumRef<'l> {
     #[inline(always)]
-    fn eq(&self, rhs: &Self) -> bool {
+    fn eq(&self, rhs: &LBNumRef<'r>) -> bool {
         self.cmp(rhs) == Ordering::Equal
     }
 }
 impl Eq for LBNumRef<'_> {}
-impl cmp::PartialOrd for LBNumRef<'_> {
+impl<'l, 'r> PartialOrd<LBNumRef<'r>> for LBNumRef<'l> {
     #[inline(always)]
-    fn partial_cmp(&self, rhs: &Self) -> Option<Ordering> {
+    fn partial_cmp(&self, rhs: &LBNumRef<'r>) -> Option<Ordering> {
         Some(self.cmp(rhs))
     }
 }
-impl<'a> cmp::Ord for LBNumRef<'a> {
+impl<'l> Ord for LBNumRef<'l> {
     #[inline]
     fn cmp(&self, rhs: &Self) -> Ordering {
         match self.inner().len().cmp(&rhs.inner().len()) {
@@ -55,33 +57,33 @@ impl<'a> cmp::Ord for LBNumRef<'a> {
         }
     }
 }
-impl PartialEq<LBNumRef<'_>> for LBNum {
+impl<'r> PartialEq<LBNumRef<'r>> for LBNum {
     #[inline(always)]
     fn eq(&self, rhs: &LBNumRef<'_>) -> bool {
         LBNumRef::from(self).cmp(rhs) == Ordering::Equal
     }
 }
-impl PartialOrd<LBNumRef<'_>> for LBNum {
+impl<'r> PartialOrd<LBNumRef<'r>> for LBNum {
     #[inline(always)]
     fn partial_cmp(&self, rhs: &LBNumRef<'_>) -> Option<Ordering> {
         Some(LBNumRef::from(self).cmp(rhs))
     }
 }
-impl PartialEq<LBNum> for LBNumRef<'_> {
+impl<'r> PartialEq<LBNum> for LBNumRef<'r> {
     #[inline(always)]
     fn eq(&self, rhs: &LBNum) -> bool {
         self.cmp(&LBNumRef::from(rhs)) == Ordering::Equal
     }
 }
-impl PartialOrd<LBNum> for LBNumRef<'_> {
+impl<'r> PartialOrd<LBNum> for LBNumRef<'r> {
     #[inline(always)]
     fn partial_cmp(&self, rhs: &LBNum) -> Option<Ordering> {
         Some(self.cmp(&LBNumRef::from(rhs)))
     }
 }
 
-macro_rules! impl_partial_eq_ord_to_primitive {
-    ($ty:ident) => {
+macro_rules! impl_compare_to_primitive {
+    ($($ty:ident)+) => ($(
         impl PartialEq<$ty> for LBNum {
             #[inline(always)]
             fn eq(&self, rhs: &$ty) -> bool {
@@ -142,12 +144,9 @@ macro_rules! impl_partial_eq_ord_to_primitive {
                 LBNum::from(*self).partial_cmp(rhs)
             }
         }
-    };
+    )+)
 }
 
-impl_partial_eq_ord_to_primitive!(u8   );
-impl_partial_eq_ord_to_primitive!(u16  );
-impl_partial_eq_ord_to_primitive!(u32  );
-impl_partial_eq_ord_to_primitive!(u64  );
-impl_partial_eq_ord_to_primitive!(u128 );
-impl_partial_eq_ord_to_primitive!(usize);
+impl_compare_to_primitive! {
+    u8 u16 u32 u64 u128 usize
+}

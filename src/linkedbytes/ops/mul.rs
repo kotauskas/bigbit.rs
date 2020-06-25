@@ -1,7 +1,8 @@
 #![cfg_attr(feature = "clippy", allow(clippy::use_self))] // Multiplication impl blocks do this intentionally.
 
-use crate::linkedbytes::{
-    LBNum, LBNumRef,
+use crate::{
+    linkedbytes::{LBNum, LBNumRef},
+    AddAssignAt,
 };
 use core::{
     ops,
@@ -30,11 +31,11 @@ impl<'l, 'r> ops::Mul<LBNumRef<'r>> for LBNumRef<'l> {
             // This swaps the borrows so that the left one always has more bytes
             swap(&mut left, &mut right);
         }
-        for byte_on_left in left.iter_le() {
+        for (byte_on_left, byte_on_left_index) in left.iter_le().zip(0_usize..) {
             for byte_on_right in right.iter_le() {
                 let terms_multiplied
                     = (byte_on_left.into_int7() as u16) * (byte_on_right.into_int7() as u16);
-                result += terms_multiplied;
+                result.add_assign_at(byte_on_left_index, terms_multiplied);
             }
         }
         result

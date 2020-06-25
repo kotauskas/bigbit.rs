@@ -1,12 +1,18 @@
-use crate::{linkedbytes::{LBNum, LBNumRef}, POWERS_OF_128};
-use core::{convert::TryFrom};
+use crate::{
+    linkedbytes::{LBNum, LBNumRef},
+    POWERS_OF_128,
+};
+use core::{
+    convert::TryFrom,
+    fmt::{self, Formatter, Display},
+};
 
 macro_rules! impl_from_lb_for_primitive {
-    ($ty:ident) => {
-        impl<'a> TryFrom<LBNumRef<'a>> for $ty {
+    ($($ty:ident)+) => ($(
+        impl<'r> TryFrom<LBNumRef<'r>> for $ty {
             type Error = TryFromIntError;
 
-            fn try_from(op: LBNumRef<'a>) -> Result<Self, TryFromIntError> {
+            fn try_from(op: LBNumRef<'r>) -> Result<Self, TryFromIntError> {
                 if op.inner().len() > POWERS_OF_128.len() {return Err(TryFromIntError);}
                 let mut result: $ty = 0;
                 for (num, el) in op.inner().iter().enumerate() {
@@ -23,11 +29,11 @@ macro_rules! impl_from_lb_for_primitive {
                 Ok(result)
             }
         }
-        impl<'a> TryFrom<&'a LBNum> for $ty {
+        impl TryFrom<&LBNum> for $ty {
             type Error = TryFromIntError;
 
             #[inline(always)]
-            fn try_from(op: &'a LBNum) -> Result<$ty, TryFromIntError> {
+            fn try_from(op: &LBNum) -> Result<$ty, TryFromIntError> {
                 $ty::try_from(LBNumRef::from(op))
             }
         }
@@ -40,23 +46,26 @@ macro_rules! impl_from_lb_for_primitive {
                 $ty::try_from(&op)
             }
         }
-    };
+    )+)
 }
 
-/// Marker error type indicating that an integer
+/// Marker error type indicating that an integer conversion from a Linked Bytes number has failed.
 #[derive(Copy, Clone, Debug, Default, PartialEq, Eq)]
 pub struct TryFromIntError;
+impl Display for TryFromIntError {
+    fn fmt(&self, f: &mut Formatter) -> fmt::Result {
+        f.write_str("conversion from Linked Bytes to scalar integer failed")
+    }
+}
+#[cfg(feature = "std")]
+impl std::error::Error for TryFromIntError {}
 
-impl_from_lb_for_primitive!(u8  );
-// FIXME: Because LinkedByte stores a u8, converting into i8 currently complains. Currently i8::try_from(u8::try_from(...).unwrap()).unwrap() works.
-// impl_from_lb_for_primitive!(i8  );
-impl_from_lb_for_primitive!(u16  );
-impl_from_lb_for_primitive!(i16  );
-impl_from_lb_for_primitive!(u32  );
-impl_from_lb_for_primitive!(i32  );
-impl_from_lb_for_primitive!(u64  );
-impl_from_lb_for_primitive!(i64  );
-impl_from_lb_for_primitive!(u128 );
-impl_from_lb_for_primitive!(i128 );
-impl_from_lb_for_primitive!(usize);
-impl_from_lb_for_primitive!(isize);
+impl_from_lb_for_primitive! {
+    // FIXME: Because LinkedByte stores a u8, converting into i8 currently complains. i8::try_from(u8::try_from(...).unwrap()).unwrap() works though.
+    u8
+    u16     i16
+    u32     i32
+    u64     i64
+    u128   i128
+    usize isize
+}
